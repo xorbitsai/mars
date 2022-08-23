@@ -17,8 +17,11 @@ import os
 from typing import Dict, List
 from urllib.parse import urlparse
 
+from fsspec import get_fs_token_paths
+
 from ..compression import compress
 from .base import path_type, FileSystem
+from .fsspec_adapter import FsSpecAdapter
 from .local import LocalFileSystem
 from .oss import OSSFileSystem
 
@@ -42,23 +45,18 @@ def get_fs(path: path_type, storage_options: Dict = None) -> FileSystem:
     if scheme == "" or len(scheme) == 1:  # len == 1 for windows
         scheme = "file"
 
-    try:
+    if scheme in _filesystems:
         file_system_type = _filesystems[scheme]
-    except KeyError:  # pragma: no cover
-        if scheme == "hdfs":
-            raise ImportError("Need to install `pyarrow` to connect to HDFS.")
-        raise ValueError(
-            f"Unknown file system type: {scheme}, "
-            f'available include: {", ".join(_filesystems)}'
-        )
-
-    if scheme == "file" or scheme == "oss":
-        # local file system use an singleton.
-        return file_system_type.get_instance()
+        if scheme == "file" or scheme == "oss":
+            # local file systems are singletons.
+            return file_system_type.get_instance()
+        else:
+            options = file_system_type.parse_from_path(path)
+            storage_options.update(options)
+            return file_system_type(**storage_options)
     else:
-        options = file_system_type.parse_from_path(path)
-        storage_options.update(options)
-        return file_system_type(**storage_options)
+        fs, _, _ = get_fs_token_paths(path, storage_options=storage_options)
+        return FsSpecAdapter(fs)
 
 
 def glob(path: path_type, storage_options: Dict = None) -> List[path_type]:

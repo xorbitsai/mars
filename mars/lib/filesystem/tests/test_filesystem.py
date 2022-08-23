@@ -25,7 +25,8 @@ except ImportError:  # pragma: no cover
     pa = None
 
 from ....tests.core import require_hadoop
-from .. import glob, FileSystem, LocalFileSystem, FSMap
+from .. import glob, FileSystem, LocalFileSystem, FSMap, get_fs
+from ..fsspec_adapter import FsSpecAdapter
 
 if pa is not None:
     from ..arrow import ArrowBasedLocalFileSystem, HadoopFileSystem
@@ -198,3 +199,14 @@ def test_fsmap():
         # create root
         fs_map = FSMap(root + "/path2", fs, create=True)
         assert len(fs_map) == 0
+
+
+def test_get_fs():
+    fs = get_fs("file://")
+    assert isinstance(fs, LocalFileSystem)
+    fs = get_fs("memory://")
+    assert isinstance(fs, FsSpecAdapter)
+    try:
+        get_fs("invalid://")
+    except ValueError as e:
+        assert "Protocol not known" in e.__str__()
