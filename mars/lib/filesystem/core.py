@@ -17,11 +17,8 @@ import os
 from typing import Dict, List
 from urllib.parse import urlparse
 
-from fsspec import get_fs_token_paths
-
 from ..compression import compress
 from .base import path_type, FileSystem
-from .fsspec_adapter import FsSpecAdapter
 from .local import LocalFileSystem
 from .oss import OSSFileSystem
 
@@ -55,8 +52,15 @@ def get_fs(path: path_type, storage_options: Dict = None) -> FileSystem:
             storage_options.update(options)
             return file_system_type(**storage_options)
     else:
-        fs, _, _ = get_fs_token_paths(path, storage_options=storage_options)
-        return FsSpecAdapter(fs)
+        try:
+            from fsspec import get_fs_token_paths
+            from .fsspec_adapter import FsSpecAdapter
+
+            fs, _, _ = get_fs_token_paths(path, storage_options=storage_options)
+            return FsSpecAdapter(fs)
+        except ImportError as e:
+            raise ImportError('Need to install `fsspec` to access specified '
+                              'datasource.')
 
 
 def glob(path: path_type, storage_options: Dict = None) -> List[path_type]:
