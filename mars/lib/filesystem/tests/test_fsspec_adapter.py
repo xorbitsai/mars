@@ -102,12 +102,14 @@ def test_fsspec_adapter():
 
     # glob
     # the expected results come from built-in glob lib.
-    expected = ["foo.txt",
-                "dir",
-                "dir/subdir",
-                "dir/subdir/baz.txt",
-                "dir/bar.txt",
-                "test.txt"].sort()
+    expected = [
+        "foo.txt",
+        "dir",
+        "dir/subdir",
+        "dir/subdir/baz.txt",
+        "dir/bar.txt",
+        "test.txt",
+    ].sort()
     actual = adapter.glob("**", recursive=True).sort()
     assert actual == expected
     expected = ["foo.txt"]
