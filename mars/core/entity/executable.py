@@ -25,6 +25,9 @@ from ...typing import SessionType, TileableType
 from ..mode import enter_mode
 
 
+main_thread = threading.current_thread()
+
+
 class DecrefRunner:
     def __init__(self):
         self._decref_thread = None
@@ -66,11 +69,16 @@ class DecrefRunner:
             self._queue.put_nowait((None, None, None))
             self._decref_thread.join(1)
 
-    def put(self, key: str, session_ref: ref):
+    def put(self, key: str, session_ref: ref) -> concurrent.futures.Future:
+        fut = concurrent.futures.Future()
+
+        if not main_thread.is_alive():
+            fut.set_result(None)
+            return fut
+
         if self._decref_thread is None:
             self.start()
 
-        fut = concurrent.futures.Future()
         self._queue.put_nowait((key, session_ref, fut))
         return fut
 
