@@ -15,7 +15,6 @@
 from typing import List, Iterator, Tuple, Union, BinaryIO, TextIO, Dict
 
 from fsspec.spec import AbstractFileSystem
-from fsspec.core import get_fs_token_paths
 from fsspec.core import stringify_path
 
 from ...utils import implements

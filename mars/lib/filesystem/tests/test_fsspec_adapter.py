@@ -52,7 +52,7 @@ def test_fsspec_adapter():
     try:
         adapter.cat("non-existent.txt")
         pytest.fail()
-    except FileNotFoundError as ignore:
+    except FileNotFoundError:
         pass
 
     # ls
@@ -68,7 +68,7 @@ def test_fsspec_adapter():
     try:
         adapter.ls("non-existent.txt")
         pytest.fail()
-    except FileNotFoundError as ignore:
+    except FileNotFoundError:
         pass
 
     # stat
@@ -83,7 +83,7 @@ def test_fsspec_adapter():
     try:
         adapter.stat("non-existent.txt")
         pytest.fail()
-    except FileNotFoundError as ignore:
+    except FileNotFoundError:
         pass
 
     # exists
