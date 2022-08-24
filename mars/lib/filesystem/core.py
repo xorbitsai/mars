@@ -59,8 +59,9 @@ def get_fs(path: path_type, storage_options: Dict = None) -> FileSystem:
             fs, _, _ = get_fs_token_paths(path, storage_options=storage_options)
             return FsSpecAdapter(fs)
         except ImportError:
-            raise ImportError('Need to install `fsspec` to access specified '
-                              'datasource.')
+            raise ImportError(
+                "Need to install `fsspec` to access specified " "datasource."
+            )
 
 
 def glob(path: path_type, storage_options: Dict = None) -> List[path_type]:
