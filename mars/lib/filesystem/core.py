@@ -60,7 +60,7 @@ def get_fs(path: path_type, storage_options: Dict = None) -> FileSystem:
             return FsSpecAdapter(fs)
         except ImportError:
             raise ImportError(
-                "Need to install `fsspec` to access specified " "datasource."
+                "Need to install `fsspec` to access specified datasource."
             )
 
 
