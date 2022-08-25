@@ -75,8 +75,3 @@ class FsSpecAdapter(FileSystem):
         from ._glob import FileSystemGlob
 
         return FileSystemGlob(self).glob(stringify_path(path), recursive=recursive)
-
-
-class AzureBlobFileSystemAdapter(FsSpecAdapter):
-    def __init__(self, **kwargs):
-        super().__init__("az", **kwargs)

@@ -17,15 +17,20 @@ try:
     from adlfs import AzureBlobFileSystem as _AzureBlobFileSystem
 
     # make sure fsspec is installed
-    from .fsspec_adapter import AzureBlobFileSystemAdapter as AzureBlobFileSystem
+    from .fsspec_adapter import FsSpecAdapter
 
     del _AzureBlobFileSystem
 except ImportError as e:
-    print(e.__str__())
-    AzureBlobFileSystem = None
+    FsSpecAdapter = None
 
-from .core import register_filesystem
+if FsSpecAdapter is not None:
+    from .core import register_filesystem
 
-if AzureBlobFileSystem is not None:
+    class AzureBlobFileSystem(FsSpecAdapter):
+        def __init__(self, **kwargs):
+            super().__init__("az", **kwargs)
+
     register_filesystem("az", AzureBlobFileSystem)
     register_filesystem("abfs", AzureBlobFileSystem)
+else:
+    AzureBlobFileSystem = None
