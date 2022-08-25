@@ -55,7 +55,7 @@ def get_fs(path: path_type, storage_options: Dict = None) -> FileSystem:
         else:
             options = file_system_type.parse_from_path(path)
             storage_options.update(options)
-            return file_system_type(scheme=scheme, **storage_options)
+            return file_system_type(**storage_options)
     elif scheme in _scheme_to_dependencies:
         dependencies = ", ".join(_scheme_to_dependencies[scheme])
         raise ImportError(f"Need to install {dependencies} to access {scheme}.")

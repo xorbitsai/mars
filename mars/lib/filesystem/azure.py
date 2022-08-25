@@ -16,7 +16,7 @@ try:
     # make sure adlfs is installed
     from adlfs import AzureBlobFileSystem as _AzureBlobFileSystem
     # make sure fsspec is installed
-    from .fsspec_adapter import FsSpecAdapter as AzureBlobFileSystem
+    from .fsspec_adapter import AzureBlobFileSystemAdapter as AzureBlobFileSystem
 
     del _AzureBlobFileSystem
 except ImportError as e:
