@@ -22,7 +22,8 @@ fsspec_installed = lazy_import("fsspec") is not None
 @pytest.mark.skipif(not fsspec_installed, reason="fsspec not installed")
 def test_fsspec_adapter():
     """
-    Assuming the implementations follows fsspec strictly, we only need to test if the adapter works correctly.
+    Assuming the implementations follows fsspec strictly, we only need to test if the adapter
+    works correctly.
     """
     from ..fsspec_adapter import FsSpecAdapter
 
