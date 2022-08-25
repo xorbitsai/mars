@@ -27,7 +27,7 @@ _filesystems = {"file": LocalFileSystem, "oss": OSSFileSystem}
 _scheme_to_dependencies = {
     "hdfs": ["pyarrow"],
     "az": ["fsspec", "adlfs"],
-    "abfs": ["fsspec", "adlfs"]
+    "abfs": ["fsspec", "adlfs"],
 }
 
 
