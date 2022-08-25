@@ -205,14 +205,15 @@ def test_fsmap():
 
 @pytest.mark.skipif(not fsspec_installed, reason="fsspec not installed")
 def test_get_fs():
-    from .. import get_fs
+    from .. import get_fs, register_filesystem
     from ..fsspec_adapter import FsSpecAdapter
 
-    fs = get_fs("file://")
-    assert isinstance(fs, LocalFileSystem)
-    fs = get_fs("memory://")
-    assert isinstance(fs, FsSpecAdapter)
+    register_filesystem("memory", FsSpecAdapter)
+
+    assert isinstance(get_fs("file://"), LocalFileSystem)
+    assert isinstance(get_fs("memory://"), FsSpecAdapter)
+
     try:
-        get_fs("invalid://")
+        get_fs("unknown://")
     except ValueError as e:
-        assert "Protocol not known" in e.__str__()
+        assert "Unknown file system type" in e.__str__()

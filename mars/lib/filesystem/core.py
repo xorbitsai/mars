@@ -24,6 +24,11 @@ from .oss import OSSFileSystem
 
 
 _filesystems = {"file": LocalFileSystem, "oss": OSSFileSystem}
+_scheme_to_dependencies = {
+    "hdfs": ["pyarrow"],
+    "az": ["fsspec", "adlfs"],
+    "abfs": ["fsspec", "adlfs"]
+}
 
 
 def register_filesystem(name: str, fs):
@@ -50,18 +55,15 @@ def get_fs(path: path_type, storage_options: Dict = None) -> FileSystem:
         else:
             options = file_system_type.parse_from_path(path)
             storage_options.update(options)
-            return file_system_type(**storage_options)
+            return file_system_type(scheme=scheme, **storage_options)
+    elif scheme in _scheme_to_dependencies:
+        dependencies = ", ".join(_scheme_to_dependencies[scheme])
+        raise ImportError(f"Need to install {dependencies} to access {scheme}.")
     else:
-        try:
-            from fsspec import get_fs_token_paths
-            from .fsspec_adapter import FsSpecAdapter
-
-            fs, _, _ = get_fs_token_paths(path, storage_options=storage_options)
-            return FsSpecAdapter(fs)
-        except ImportError:
-            raise ImportError(
-                "Need to install `fsspec` to access specified datasource."
-            )
+        raise ValueError(
+            f"Unknown file system type: {scheme}, "
+            f'available include: {", ".join(_scheme_to_dependencies.keys())}'
+        )
 
 
 def glob(path: path_type, storage_options: Dict = None) -> List[path_type]:

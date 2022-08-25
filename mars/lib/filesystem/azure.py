@@ -1,4 +1,4 @@
-# Copyright 1999-2021 Alibaba Group Holding Ltd.
+# Copyright 2022 XProbe
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base import FileSystem
-from .core import file_size, glob, get_fs, open_file, register_filesystem
-from .fsmap import FSMap
-from .local import LocalFileSystem
+try:
+    # make sure adlfs is installed
+    from adlfs import AzureBlobFileSystem as _AzureBlobFileSystem
+    # make sure fsspec is installed
+    from .fsspec_adapter import FsSpecAdapter as AzureBlobFileSystem
 
-# noinspection PyUnresolvedReferences
-from .hdfs import HadoopFileSystem
-from .azure import AzureBlobFileSystem
+    del _AzureBlobFileSystem
+except ImportError as e:
+    print(e.__str__())
+    AzureBlobFileSystem = None
+
+from .core import register_filesystem
+
+if AzureBlobFileSystem is not None:
+    register_filesystem("az", AzureBlobFileSystem)
+    register_filesystem("abfs", AzureBlobFileSystem)

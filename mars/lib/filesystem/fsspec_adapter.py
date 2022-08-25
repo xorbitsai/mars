@@ -14,7 +14,7 @@
 
 from typing import List, Iterator, Tuple, Union, BinaryIO, TextIO, Dict
 
-from fsspec.spec import AbstractFileSystem
+from fsspec import filesystem
 from fsspec.core import stringify_path
 
 from ...utils import implements
@@ -23,16 +23,16 @@ from .core import path_type
 
 
 class FsSpecAdapter(FileSystem):
-    def __init__(self, fs: AbstractFileSystem):
-        self.fs = fs
+    def __init__(self, scheme, **kwargs):
+        self._fs = filesystem(scheme, **kwargs)
 
     @implements(FileSystem.cat)
     def cat(self, path: path_type) -> bytes:
-        return self.fs.cat_file(stringify_path(path))
+        return self._fs.cat_file(stringify_path(path))
 
     def ls(self, path: path_type) -> List[path_type]:
         entries = []
-        for entry in self.fs.ls(stringify_path(path), detail=False):
+        for entry in self._fs.ls(stringify_path(path), detail=False):
             if isinstance(entry, Dict):
                 entries.append(entry.get("name"))
             elif isinstance(entry, str):
@@ -45,7 +45,7 @@ class FsSpecAdapter(FileSystem):
         raise NotImplementedError
 
     def stat(self, path: path_type) -> Dict:
-        return self.fs.info(stringify_path(path))
+        return self._fs.info(stringify_path(path))
 
     def rename(self, path: path_type, new_path: path_type):
         raise NotImplementedError
@@ -54,19 +54,19 @@ class FsSpecAdapter(FileSystem):
         raise NotImplementedError
 
     def exists(self, path: path_type):
-        return self.fs.exists(stringify_path(path))
+        return self._fs.exists(stringify_path(path))
 
     def isdir(self, path: path_type) -> bool:
-        return self.fs.isdir(stringify_path(path))
+        return self._fs.isdir(stringify_path(path))
 
     def isfile(self, path: path_type) -> bool:
-        return self.fs.isfile(stringify_path(path))
+        return self._fs.isfile(stringify_path(path))
 
     def _isfilestore(self) -> bool:
         raise NotImplementedError
 
     def open(self, path: path_type, mode: str = "rb") -> Union[BinaryIO, TextIO]:
-        return self.fs.open(stringify_path(path), mode=mode)
+        return self._fs.open(stringify_path(path), mode=mode)
 
     def walk(self, path: path_type) -> Iterator[Tuple[str, List[str], List[str]]]:
         raise NotImplementedError

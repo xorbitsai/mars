@@ -24,10 +24,11 @@ def test_fsspec_adapter():
     """
     Assuming the implementations follows fsspec strictly, we only need to test if the adapter works correctly.
     """
-    from fsspec.implementations.memory import MemoryFileSystem
     from ..fsspec_adapter import FsSpecAdapter
 
-    fs = MemoryFileSystem()
+    adapter = FsSpecAdapter(scheme="memory")
+
+    fs = adapter._fs
     # generate directories and files as follows:
     # .
     # ├── dir
@@ -44,7 +45,6 @@ def test_fsspec_adapter():
     with fs.open("/dir/subdir/baz.txt", mode="wb") as f:
         f.write(str.encode("baz"))
 
-    adapter = FsSpecAdapter(fs)
     # open
     f = adapter.open("test.txt", mode="wb")
     f.write(str.encode("test"))
