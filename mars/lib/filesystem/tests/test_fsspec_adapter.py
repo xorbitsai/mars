@@ -14,15 +14,18 @@
 
 import pytest
 
-from fsspec.implementations.memory import MemoryFileSystem
+from ....utils import lazy_import
 
-from ..fsspec_adapter import FsSpecAdapter
+fsspec_installed = lazy_import("fsspec") is not None
 
 
+@pytest.mark.skipif(not fsspec_installed, reason="fsspec not installed")
 def test_fsspec_adapter():
     """
     Assuming the implementations follows fsspec strictly, we only need to test if the adapter works correctly.
     """
+    from fsspec.implementations.memory import MemoryFileSystem
+    from ..fsspec_adapter import FsSpecAdapter
 
     fs = MemoryFileSystem()
     # generate directories and files as follows:
