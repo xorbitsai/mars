@@ -78,5 +78,5 @@ class FsSpecAdapter(FileSystem):
 
 
 class AzureBlobFileSystemAdapter(FsSpecAdapter):
-    def __init__(self, scheme, **kwargs):
+    def __init__(self, **kwargs):
          super().__init__("az", **kwargs)

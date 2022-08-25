@@ -208,10 +208,14 @@ def test_get_fs():
     from .. import get_fs, register_filesystem
     from ..fsspec_adapter import FsSpecAdapter
 
-    register_filesystem("memory", FsSpecAdapter)
+    class InMemoryFileSystemAdapter(FsSpecAdapter):
+        def __init__(self, **kwargs):
+            super().__init__("memory", **kwargs)
+
+    register_filesystem("memory", InMemoryFileSystemAdapter)
 
     assert isinstance(get_fs("file://"), LocalFileSystem)
-    assert isinstance(get_fs("memory://"), FsSpecAdapter)
+    assert isinstance(get_fs("memory://"), InMemoryFileSystemAdapter)
 
     try:
         get_fs("unknown://")
