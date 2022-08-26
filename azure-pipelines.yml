@@ -105,7 +105,7 @@ jobs:
 
     - bash: |
         GIT_ORIGIN="$(git config --get remote.origin.url)"
-        if [[ "$GIT_ORIGIN" == *"mars-project/mars"* ]]; then
+        if [[ "$GIT_ORIGIN" == *"xprobe/mars"* ]]; then
           export CODECOV_TOKEN="c06bad40-2919-4265-9fc7-60eeb098d6ce"
         fi
         bash <(curl -s https://codecov.io/bash)
