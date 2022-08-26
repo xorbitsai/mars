@@ -20,7 +20,7 @@ try:
     from .fsspec_adapter import FsSpecAdapter
 
     del _AzureBlobFileSystem
-except ImportError as e:
+except ImportError:
     FsSpecAdapter = None
 
 if FsSpecAdapter is not None:
