@@ -23,7 +23,7 @@ try:
 except ImportError:
     FsSpecAdapter = None
 
-if FsSpecAdapter is not None:
+if FsSpecAdapter is not None:  # pragma: no cover
     from .core import register_filesystem
 
     class AzureBlobFileSystem(FsSpecAdapter):

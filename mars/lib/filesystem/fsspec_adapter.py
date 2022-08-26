@@ -37,7 +37,7 @@ class FsSpecAdapter(FileSystem):
                 entries.append(entry.get("name"))
             elif isinstance(entry, str):
                 entries.append(entry)
-            else:
+            else:  # pragma: no cover
                 raise TypeError(f"Expect str or dict, but got {type(entry)}")
         return entries
 

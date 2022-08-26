@@ -69,6 +69,9 @@ def test_fsspec_adapter():
     assert 2 == len(entries)
     assert "/dir/bar.txt" in entries
     assert "/dir/subdir" in entries
+    entries = adapter.ls("test.txt")
+    assert 1 == len(entries)
+    assert "/test.txt" in entries
     try:
         adapter.ls("non-existent.txt")
         pytest.fail()
