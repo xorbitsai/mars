@@ -76,15 +76,15 @@ cdef class Serializer:
         The returned value can be a Placeholder or a tuple comprising
         of three parts: a header, a group of subcomponents and
         a finalizing flag.
-        
+
         * Header is a pickle-serializable tuple
         * Subcomponents are parts or buffers for iterative
           serialization.
-        * Flag is a boolean value. If true, subcomponents should be 
+        * Flag is a boolean value. If true, subcomponents should be
           buffers (for instance, bytes, memory views, GPU buffers,
-          etc.) that can be read and written directly. If false, 
+          etc.) that can be read and written directly. If false,
           subcomponents will be serialized iteratively.
-        
+
         Parameters
         ----------
         obj: Any
@@ -104,7 +104,7 @@ cdef class Serializer:
         """
         Returns deserialized object given serialized headers and
         deserialized subcomponents.
-        
+
         Parameters
         ----------
         serialized: Tuple
@@ -132,7 +132,7 @@ cdef class Serializer:
     ):
         """
         Returns rewritten exception when subcomponent deserialization fails
-        
+
         Parameters
         ----------
         serialized: Tuple
@@ -146,7 +146,7 @@ cdef class Serializer:
             Index of subcomponent causing error
         exc: BaseException
             Exception raised
-            
+
         Returns
         -------
         exc: BaseException | None

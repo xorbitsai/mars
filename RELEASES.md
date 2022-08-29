@@ -8,9 +8,9 @@ Versioning
 ----------
 
 The versioning of Mars follows [PEP 440](https://www.python.org/dev/peps/pep-0440/) and a part of [Semantic versioning](<https://semver.org/>).
-The version number consists of three or four parts: `X.Y.Zw` where `X` denotes the **major version**, 
+The version number consists of three or four parts: `X.Y.Zw` where `X` denotes the **major version**,
 `Y` denotes the **minor version**, `Z` denotes the **revision number**, and the optional `w` denotes the pre-release suffix.
-While the major, minor, and revision numbers follow the rule of semantic versioning, 
+While the major, minor, and revision numbers follow the rule of semantic versioning,
 the pre-release suffix follows PEP 440 so that the version string is much friendly with Python eco-system.
 
 **Note that a major update basically does not contain compatibility-breaking changes from the last release candidate (RC).**
@@ -36,15 +36,15 @@ Then, the timeline of the updates is depicted by the following table.
 (* These might be revision releases)
 
 The dates shown in the left-most column are relative to the release of `0.X.0rc1`.
-In particular, each revision/minor release is made two weeks after the previous one of the same major version, 
+In particular, each revision/minor release is made two weeks after the previous one of the same major version,
 and the pre-release of the upcoming major version is made at the same time.
 Whether these releases are revision or minor is determined based on the contents of each update.
 
 Note that there are only three stable releases for the versions `0.X.x`.
-During the parallel development of `0.Y.0` and `0.Z.0a1`, 
+During the parallel development of `0.Y.0` and `0.Z.0a1`,
 the version `0.Y` is treated as an **almost-stable version** and `0.Z` is treated as a development version.
 
-If there is a critical bug found in `0.X.x` after stopping the development of version `0.X`, 
+If there is a critical bug found in `0.X.x` after stopping the development of version `0.X`,
 we may release a hot-fix for this version at any time.
 
 We create a milestone for each upcoming release at GitHub.
