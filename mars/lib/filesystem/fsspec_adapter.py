@@ -23,13 +23,14 @@ from .core import path_type
 
 
 class FsSpecAdapter(FileSystem):
-    def __init__(self, scheme, **kwargs):
+    def __init__(self, scheme: str, **kwargs):
         self._fs = filesystem(scheme, **kwargs)
 
     @implements(FileSystem.cat)
     def cat(self, path: path_type) -> bytes:
         return self._fs.cat_file(stringify_path(path))
 
+    @implements(FileSystem.ls)
     def ls(self, path: path_type) -> List[path_type]:
         entries = []
         for entry in self._fs.ls(stringify_path(path), detail=False):
@@ -41,36 +42,47 @@ class FsSpecAdapter(FileSystem):
                 raise TypeError(f"Expect str or dict, but got {type(entry)}")
         return entries
 
+    @implements(FileSystem.delete)
     def delete(self, path: path_type, recursive: bool = False):
         raise NotImplementedError
 
+    @implements(FileSystem.stat)
     def stat(self, path: path_type) -> Dict:
         return self._fs.info(stringify_path(path))
 
+    @implements(FileSystem.rename)
     def rename(self, path: path_type, new_path: path_type):
         raise NotImplementedError
 
+    @implements(FileSystem.mkdir)
     def mkdir(self, path: path_type, create_parents: bool = True):
         raise NotImplementedError
 
+    @implements(FileSystem.exists)
     def exists(self, path: path_type):
         return self._fs.exists(stringify_path(path))
 
+    @implements(FileSystem.isdir)
     def isdir(self, path: path_type) -> bool:
         return self._fs.isdir(stringify_path(path))
 
+    @implements(FileSystem.isfile)
     def isfile(self, path: path_type) -> bool:
         return self._fs.isfile(stringify_path(path))
 
+    @implements(FileSystem._isfilestore)
     def _isfilestore(self) -> bool:
         raise NotImplementedError
 
+    @implements(FileSystem.open)
     def open(self, path: path_type, mode: str = "rb") -> Union[BinaryIO, TextIO]:
         return self._fs.open(stringify_path(path), mode=mode)
 
+    @implements(FileSystem.walk)
     def walk(self, path: path_type) -> Iterator[Tuple[str, List[str], List[str]]]:
         raise NotImplementedError
 
+    @implements(FileSystem.glob)
     def glob(self, path: path_type, recursive: bool = False) -> List[path_type]:
         from ._glob import FileSystemGlob
 

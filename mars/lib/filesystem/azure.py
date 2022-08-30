@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-try:
+try:  # pragma: no cover
     # make sure adlfs is installed
     from adlfs import AzureBlobFileSystem as _AzureBlobFileSystem
 
