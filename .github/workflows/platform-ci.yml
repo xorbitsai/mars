@@ -152,7 +152,7 @@ jobs:
             coverage combine build/ && coverage report
           fi
           if [ -n "$WITH_RAY" ]; then
-            pytest $PYTEST_CONFIG --durations=0 --timeout=200 -v -s --ignore=mars/deploy/oscar/ -m ray 
+            pytest $PYTEST_CONFIG --durations=0 --timeout=200 -v -s --ignore=mars/deploy/oscar/ -m ray
             coverage report
           fi
           if [ -n "$WITH_RAY_DEPLOY" ]; then
@@ -168,7 +168,7 @@ jobs:
             mv .coverage build/.coverage.test_ray_fault_injection.file
             pytest $PYTEST_CONFIG --durations=0 --timeout=200 -v -s mars/deploy/oscar/tests/test_ray_scheduling.py -m ray
             mv .coverage build/.coverage.test_ray_scheduling.file
-          
+
             coverage combine build/ && coverage report
           fi
           if [ -n "$WITH_RAY_DAG" ]; then
@@ -179,7 +179,7 @@ jobs:
             mv .coverage build/.coverage.test_ray_dag.file
             pytest $PYTEST_CONFIG --durations=0 --timeout=200 -v -s mars/deploy/oscar/tests/test_ray_dag_failover.py
             mv .coverage build/.coverage.test_ray_dag_failover.file
-            
+
             coverage combine build/ && coverage report
           fi
           if [ -n "$RUN_DASK" ]; then
