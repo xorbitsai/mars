@@ -17,6 +17,7 @@ from ...core import NodeRole, AbstractService
 from ..procinfo import ProcessInfoManagerActor
 from ..uploader import NodeInfoUploaderActor
 from .locator import WorkerSupervisorLocatorActor
+from ..file_logger import FileLoggerActor
 
 
 class ClusterWorkerService(AbstractService):
@@ -67,6 +68,11 @@ class ClusterWorkerService(AbstractService):
             uid=ProcessInfoManagerActor.default_uid(),
             address=address,
         )
+        await mo.create_actor(
+            FileLoggerActor,
+            uid=FileLoggerActor.default_uid(),
+            address=address
+        )
 
     async def stop(self):
         address = self._address
@@ -79,5 +85,10 @@ class ClusterWorkerService(AbstractService):
         await mo.destroy_actor(
             mo.create_actor_ref(
                 uid=WorkerSupervisorLocatorActor.default_uid(), address=address
+            )
+        )
+        await mo.destroy_actor(
+            mo.create_actor_ref(
+                uid=FileLoggerActor.default_uid(), address=address
             )
         )

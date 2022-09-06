@@ -38,6 +38,7 @@ class OscarCommandRunner:
     command_description = None
     node_role = None
     _port_file_prefix = "mars_service_process"
+    mars_temp_log = "MARS_TEMP_LOG"
 
     def __init__(self):
         faulthandler.enable()
@@ -80,6 +81,21 @@ class OscarCommandRunner:
             "--use-uvloop", help="use uvloop, 'auto' by default. Use 'no' to disable"
         )
 
+    def _set_log_file_env(self):
+        if self.config is None:
+            raise ValueError('Read yml config failed!')
+        cluster_config: dict = self.config.get('cluster')
+        if cluster_config is None:
+            raise KeyError('\"cluster\" key is missing!')
+        log_dir = cluster_config.get("log_dir")
+        prefix = "mars_"
+        # default config, then create a temp file
+        if log_dir is None or log_dir == 'null':
+            _, file_path = tempfile.mkstemp(prefix=prefix)
+        else:
+            _, file_path = tempfile.mkstemp(prefix=prefix, dir=log_dir)
+        os.environ[self.mars_temp_log] = file_path
+
     def _get_logging_config_paths(self):
         import mars
 
@@ -92,6 +108,7 @@ class OscarCommandRunner:
         ]
 
     def config_logging(self):
+        self._set_log_file_env()
         for conf_path in self._get_logging_config_paths():
             if os.path.exists(conf_path):
                 self.logging_conf["file"] = conf_path

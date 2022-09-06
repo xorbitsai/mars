@@ -307,6 +307,16 @@ class ClusterAPI(AbstractClusterAPI):
         ref = await self._get_process_info_manager_ref(address)
         return await ref.get_thread_stacks()
 
+    async def _get_log_ref(self, address: str = None):
+        from ..file_logger import FileLoggerActor
+        return await mo.actor_ref(
+            FileLoggerActor.default_uid(), address=address or self._address
+        )
+
+    async def get_log_content(self, address: str = None):
+        ref = await self._get_log_ref(address)
+        return await ref.fetch_logs()
+
 
 class MockClusterAPI(ClusterAPI):
     @classmethod

@@ -28,6 +28,7 @@ from .core import AbstractClusterAPI
 
 class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
     _root_pattern = "/api/cluster"
+    mars_log_file_env = "MARS_TEMP_LOG"
 
     @alru_cache(cache_exceptions=False)
     async def _get_cluster_api(self):
@@ -157,6 +158,19 @@ class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
                 {
                     "generate_time": time.time(),
                     "stacks": stacks,
+                }
+            )
+        )
+
+    @web_api("logs", method="get", cache_blocking=True)
+    async def get_node_log(self):
+        cluster_api = await self._get_cluster_api()
+        address = self.get_argument("address", "") or None
+        content = await cluster_api.get_log_content(address)
+        self.write(
+            json.dumps(
+                {
+                    "content": content
                 }
             )
         )
