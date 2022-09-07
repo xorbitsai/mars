@@ -313,9 +313,9 @@ class ClusterAPI(AbstractClusterAPI):
             FileLoggerActor.default_uid(), address=address or self._address
         )
 
-    async def get_log_content(self, address: str = None):
+    async def get_log_content(self, size: int, address: str = None):
         ref = await self._get_log_ref(address)
-        return await ref.fetch_logs()
+        return await ref.fetch_logs(size)
 
 
 class MockClusterAPI(ClusterAPI):

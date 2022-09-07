@@ -1,6 +1,11 @@
 import React from "react";
 import Title from "../Title";
 import Paper from "@material-ui/core/Paper";
+import {formatTime} from '../Utils';
+import Button from '@material-ui/core/Button';
+import SaveIcon from '@material-ui/icons/Save';
+import Grid from '@material-ui/core/Grid';
+
 
 export default class NodeLogTab extends React.Component {
     constructor(props) {
@@ -36,7 +41,21 @@ export default class NodeLogTab extends React.Component {
         }
         return (
             <div>
-                <Title component="h3">Generate Time: {new Date().toLocaleString()}</Title>
+                <Grid container spacing={2}>
+                    <Grid item xs={8}>
+                        <Title component="h3">Generate Time: {formatTime(this.getTimestamp() / 1000)}</Title>
+                    </Grid>
+                    <Grid item xs>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            size="small"
+                            startIcon={<SaveIcon/>}
+                            onClick={() => this.downloadLogs()}
+                        >Save
+                        </Button>
+                    </Grid>
+                </Grid>
                 <div>
                     <Paper style={{width: '100%', overflow: 'auto'}}>
                         <pre style={{fontSize: 'smaller'}}>{this.state.content}</pre>
@@ -55,5 +74,28 @@ export default class NodeLogTab extends React.Component {
                     content: res.content
                 })
             })
+    }
+
+    getTimestamp() {
+        return new Date().getTime()
+    }
+
+    downloadLogs() {
+        const filename = "".concat(
+            "mars_",
+            this.props.role, "_",
+            this.props.endpoint, "_",
+            this.getTimestamp().toString(), "_",
+            "log.txt")
+        fetch(`api/cluster/logs?address=${this.props.endpoint}&&size=-1&&filename=${filename}`)
+            .then(res => res.blob().then(blob => {
+                let a = document.createElement('a');
+                let url = window.URL.createObjectURL(blob);
+                a.href = url;
+                a.download = filename;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a = null;
+            }))
     }
 }

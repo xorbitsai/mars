@@ -61,7 +61,7 @@ export default function SupervisorDetailPage(props) {
             <NodeStackTab endpoint={props.endpoint} />
           </TabPanel>
           <TabPanel value={value} index={3}>
-            <NodeLogTab endpoint={props.endpoint} />
+            <NodeLogTab endpoint={props.endpoint} role="supervisor"/>
           </TabPanel>
         </Paper>
       </Grid>

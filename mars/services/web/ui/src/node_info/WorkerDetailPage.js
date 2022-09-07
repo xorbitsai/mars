@@ -61,7 +61,7 @@ export default function WorkerDetailPage(props) {
             <NodeStackTab endpoint={props.endpoint} />
           </TabPanel>
           <TabPanel value={value} index={3}>
-            <NodeLogTab endpoint={props.endpoint} />
+            <NodeLogTab endpoint={props.endpoint} role="worker"/>
           </TabPanel>
         </Paper>
       </Grid>
