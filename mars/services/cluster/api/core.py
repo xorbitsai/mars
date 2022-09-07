@@ -173,3 +173,17 @@ class AbstractClusterAPI:
         -------
 
         """
+
+    async def get_node_log_content(self, size: int, address: str) -> str:
+        """
+        Get current custom log content of a Mars node
+
+        Parameters
+        ----------
+        size
+        address
+
+        Returns
+        -------
+
+        """

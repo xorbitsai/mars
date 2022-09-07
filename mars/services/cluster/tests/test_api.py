@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import ast
 import asyncio
 
 import pytest
@@ -91,6 +91,9 @@ async def test_api(actor_pool):
         role=NodeRole.WORKER, exclude_statuses={NodeStatus.STOPPED}
     )
 
+    assert "" == await api.get_node_log_content(size=10, address=pool_addr)
+    assert not await api.get_node_log_content(size=-1, address=pool_addr)
+
     await MockClusterAPI.cleanup(pool_addr)
 
 
@@ -135,6 +138,15 @@ async def test_web_api(actor_pool):
     assert len(proc_info) > 0
     stacks = await web_api.get_node_thread_stacks(pool_addr)
     assert len(stacks) > 0
+
+    log_content = await web_api.get_node_log_content(address=pool_addr)
+    assert len(log_content) == 0
+
+    log_content = await web_api.get_node_log_content(size=5, address=pool_addr)
+    assert len(log_content) == 0
+
+    log_content = await web_api.get_node_log_content(size=-1, address=pool_addr)
+    assert log_content
 
     await MockClusterAPI.cleanup(pool_addr)
 

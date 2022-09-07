@@ -168,7 +168,7 @@ class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
         address = self.get_argument("address", "") or None
         # 10MB by default
         size = int(self.get_argument("size", str(10 * 1024 * 1024)))
-        content = await cluster_api.get_log_content(size, address=address)
+        content = await cluster_api.get_node_log_content(size, address=address)
         if size != -1:
             self.write(
                 json.dumps(
@@ -357,3 +357,17 @@ class WebClusterAPI(AbstractClusterAPI, MarsWebAPIClientMixin):
         path = f"{self._address}/api/cluster/stacks?address={address}"
         res = await self._request_url("GET", path)
         return list(json.loads(res.body)["stacks"])
+
+    async def get_node_log_content(self, size: int = None, address: str = None) -> str:
+        if size is None:
+            path = f"{self._address}/api/cluster/logs?address={address}"
+            res = await self._request_url("GET", path)
+            return str(json.loads(res.body)["content"])
+        elif size == -1:
+            path = f"{self._address}/api/cluster/logs?address={address}&&size={size}&&filename=test.log"
+            res = await self._request_url("GET", path)
+            return str(res.body)
+        else:
+            path = f"{self._address}/api/cluster/logs?address={address}&&size={size}"
+            res = await self._request_url("GET", path)
+            return str(json.loads(res.body)["content"])

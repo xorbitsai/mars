@@ -34,5 +34,5 @@ class FileLoggerActor(mo.Actor):
 
         return res
 
-    def __pre_destroy__(self):
+    async def __pre_destroy__(self):
         os.remove(self._log_filename)

@@ -305,6 +305,24 @@ def test_parse_args():
     }
 
 
+def test_parse_log_dir():
+    mars_temp_log = "MARS_TEMP_LOG"
+    parser = argparse.ArgumentParser(description="TestService")
+    app = WorkerCommandRunner()
+    app.config_args(parser)
+    _ = app.parse_args(parser, [])
+    assert app.config['cluster']
+    assert not app.config['cluster']['log_dir']
+    assert not os.environ.get(mars_temp_log)
+    app._set_log_file_env()
+    filename = os.environ.get(mars_temp_log)
+    assert filename
+    _, file = os.path.split(filename)
+    assert file.startswith("mars_")
+    os.remove(filename)
+    assert not os.path.exists(filename)
+
+
 def test_parse_third_party_modules():
     config = {
         "third_party_modules": {
