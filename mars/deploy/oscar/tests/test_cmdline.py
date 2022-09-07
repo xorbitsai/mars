@@ -311,8 +311,8 @@ def test_parse_log_dir():
     app = WorkerCommandRunner()
     app.config_args(parser)
     _ = app.parse_args(parser, [])
-    assert app.config['cluster']
-    assert not app.config['cluster']['log_dir']
+    assert app.config["cluster"]
+    assert not app.config["cluster"]["log_dir"]
     assert not os.environ.get(mars_temp_log)
     app._set_log_file_env()
     filename = os.environ.get(mars_temp_log)

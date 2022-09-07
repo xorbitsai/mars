@@ -83,14 +83,14 @@ class OscarCommandRunner:
 
     def _set_log_file_env(self):
         if self.config is None:
-            raise ValueError('Read yml config failed!')
-        cluster_config: dict = self.config.get('cluster')
+            raise ValueError("Read yml config failed!")
+        cluster_config: dict = self.config.get("cluster")
         if cluster_config is None:
-            raise KeyError('\"cluster\" key is missing!')
+            raise KeyError('"cluster" key is missing!')
         log_dir = cluster_config.get("log_dir")
         prefix = "mars_"
         # default config, then create a temp file
-        if log_dir is None or log_dir == 'null':
+        if log_dir is None or log_dir == "null":
             _, file_path = tempfile.mkstemp(prefix=prefix)
         else:
             _, file_path = tempfile.mkstemp(prefix=prefix, dir=log_dir)

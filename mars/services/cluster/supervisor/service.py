@@ -80,9 +80,7 @@ class ClusterSupervisorService(AbstractService):
             address=address,
         )
         await mo.create_actor(
-            FileLoggerActor,
-            uid=FileLoggerActor.default_uid(),
-            address=address
+            FileLoggerActor, uid=FileLoggerActor.default_uid(), address=address
         )
 
     async def stop(self):
@@ -107,7 +105,5 @@ class ClusterSupervisorService(AbstractService):
             mo.create_actor_ref(uid=NodeAllocatorActor.default_uid(), address=address)
         )
         await mo.destroy_actor(
-            mo.create_actor_ref(
-                uid=FileLoggerActor.default_uid(), address=address
-            )
+            mo.create_actor_ref(uid=FileLoggerActor.default_uid(), address=address)
         )

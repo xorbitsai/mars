@@ -69,9 +69,7 @@ class ClusterWorkerService(AbstractService):
             address=address,
         )
         await mo.create_actor(
-            FileLoggerActor,
-            uid=FileLoggerActor.default_uid(),
-            address=address
+            FileLoggerActor, uid=FileLoggerActor.default_uid(), address=address
         )
 
     async def stop(self):
@@ -88,7 +86,5 @@ class ClusterWorkerService(AbstractService):
             )
         )
         await mo.destroy_actor(
-            mo.create_actor_ref(
-                uid=FileLoggerActor.default_uid(), address=address
-            )
+            mo.create_actor_ref(uid=FileLoggerActor.default_uid(), address=address)
         )

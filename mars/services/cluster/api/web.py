@@ -170,18 +170,12 @@ class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
         size = int(self.get_argument("size", str(10 * 1024 * 1024)))
         content = await cluster_api.get_node_log_content(size, address=address)
         if size != -1:
-            self.write(
-                json.dumps(
-                    {
-                        "content": content
-                    }
-                )
-            )
+            self.write(json.dumps({"content": content}))
         # size == -1 means downloading the current file
         else:
             filename = self.get_argument("filename", "mars_log.log")
-            self.set_header('Content-Type', 'application/octet-stream')
-            self.set_header('Content-Disposition', 'attachment; filename=' + filename)
+            self.set_header("Content-Type", "application/octet-stream")
+            self.set_header("Content-Disposition", "attachment; filename=" + filename)
             self.write(content)
             await self.finish()
 

@@ -310,6 +310,7 @@ class ClusterAPI(AbstractClusterAPI):
 
     async def _get_log_ref(self, address: str = None):
         from ..file_logger import FileLoggerActor
+
         return await mo.actor_ref(
             FileLoggerActor.default_uid(), address=address or self._address
         )
@@ -321,6 +322,7 @@ class ClusterAPI(AbstractClusterAPI):
 
 class MockClusterAPI(ClusterAPI):
     mars_temp_log = "MARS_TEMP_LOG"
+
     @classmethod
     async def create(cls: Type[APIType], address: str, **kw) -> APIType:
         import tempfile
@@ -370,10 +372,8 @@ class MockClusterAPI(ClusterAPI):
                 address=address,
             ),
             mo.create_actor(
-                FileLoggerActor,
-                uid=FileLoggerActor.default_uid(),
-                address=address
-            )
+                FileLoggerActor, uid=FileLoggerActor.default_uid(), address=address
+            ),
         ]
         dones, _ = await asyncio.wait(
             [asyncio.ensure_future(coro) for coro in create_actor_coros]
@@ -413,8 +413,6 @@ class MockClusterAPI(ClusterAPI):
                 )
             ),
             mo.destroy_actor(
-                mo.create_actor_ref(
-                    uid=FileLoggerActor.default_uid(), address=address
-                )
-            )
+                mo.create_actor_ref(uid=FileLoggerActor.default_uid(), address=address)
+            ),
         )
