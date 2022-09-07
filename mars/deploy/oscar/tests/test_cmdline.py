@@ -310,7 +310,7 @@ def test_parse_log_dir():
     parser = argparse.ArgumentParser(description="TestService")
     app = WorkerCommandRunner()
     app.config_args(parser)
-    _ = app.parse_args(parser, [])
+    _ = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
     assert app.config["cluster"]
     assert not app.config["cluster"]["log_dir"]
     assert not os.environ.get(mars_temp_log)
