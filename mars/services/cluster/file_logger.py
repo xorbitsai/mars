@@ -11,10 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 import os
+import tempfile
 
 from mars import oscar as mo
+
+logger = logging.getLogger(__name__)
 
 
 class FileLoggerActor(mo.Actor):
@@ -27,8 +30,11 @@ class FileLoggerActor(mo.Actor):
 
     def __init__(self):
         file_path = os.environ.get(self.mars_temp_log)
+        # mainly caused by test
         if file_path is None:
-            raise ValueError("Env {0} is not set!".format(self.mars_temp_log))
+            logger.warning("Env {0} is not set!".format(self.mars_temp_log))
+            _, file_path = tempfile.mkstemp(prefix="mars_")
+            os.environ[self.mars_temp_log] = file_path
         self._log_filename = file_path
 
     def fetch_logs(self, size) -> str:
@@ -83,4 +89,7 @@ class FileLoggerActor(mo.Actor):
         -------
 
         """
-        os.remove(self._log_filename)
+        if os.path.exists(self._log_filename):
+            os.remove(self._log_filename)
+        else:
+            logger.warning("Cannot find log file {0}.".format(self._log_filename))

@@ -325,17 +325,12 @@ class MockClusterAPI(ClusterAPI):
 
     @classmethod
     async def create(cls: Type[APIType], address: str, **kw) -> APIType:
-        import tempfile
         from ..file_logger import FileLoggerActor
         from ..procinfo import ProcessInfoManagerActor
         from ..supervisor.locator import SupervisorPeerLocatorActor
         from ..supervisor.node_allocator import NodeAllocatorActor
         from ..supervisor.node_info import NodeInfoCollectorActor
         from ..uploader import NodeInfoUploaderActor
-
-        # temp file for file logging
-        _, filename = tempfile.mkstemp()
-        os.environ[MockClusterAPI.mars_temp_log] = filename
 
         create_actor_coros = [
             mo.create_actor(

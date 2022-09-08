@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import tempfile
-
 import pytest
 
 from .... import oscar as mo
@@ -30,45 +28,21 @@ async def actor_pool():
         yield pool
 
 
-@pytest.fixture
-def prepare_file(actor_pool):
-    _, filename = tempfile.mkstemp()
-    with open(filename, "w") as f:
-        f.write(full_content)
-        f.close()
-    os.environ[mars_temp_log] = filename
-    return actor_pool.external_address, filename
-
-
 @pytest.mark.asyncio
-async def test_file_logger_with_no_env(actor_pool):
+async def test_file_logger(actor_pool):
     pool_addr = actor_pool.external_address
-    match = "Env {0} is not set!".format(mars_temp_log)
-    with pytest.raises(ValueError, match=match):
-        await mo.create_actor(
-            FileLoggerActor,
-            uid=FileLoggerActor.default_uid(),
-            address=pool_addr,
-        )
-
-    with pytest.raises(ValueError, match=match):
-        # wrong env key
-        os.environ["MARS_LOG"] = "1234.txt"
-        await mo.create_actor(
-            FileLoggerActor,
-            uid=FileLoggerActor.default_uid(),
-            address=pool_addr,
-        )
-
-
-@pytest.mark.asyncio
-async def test_file_logger(prepare_file):
-    pool_addr, filename = prepare_file
     logger_ref = await mo.create_actor(
         FileLoggerActor,
         uid=FileLoggerActor.default_uid(),
         address=pool_addr,
     )
+
+    filename = os.environ.get(mars_temp_log)
+    assert filename is not None
+    assert os.path.exists(filename)
+    with open(filename, "w") as f:
+        f.write(full_content)
+        f.close()
 
     byte_num = 5
     expected_data = ""
