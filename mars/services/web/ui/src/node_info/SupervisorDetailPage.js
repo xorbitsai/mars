@@ -26,7 +26,7 @@ import { useStyles } from '../Style';
 import NodeEnvTab from './NodeEnvTab';
 import NodeResourceTab from './NodeResourceTab';
 import NodeStackTab from './NodeStackTab';
-import NodeLogTab from "./NodeLogTab";
+import NodeLogTab from './NodeLogTab';
 
 
 export default function SupervisorDetailPage(props) {

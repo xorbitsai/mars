@@ -14,7 +14,6 @@
 
 import asyncio
 import logging
-import os
 from typing import List, Dict, Optional, Set, Type, TypeVar
 
 from .... import oscar as mo
