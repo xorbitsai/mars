@@ -123,7 +123,7 @@ class OscarCommandRunner:
             log_level = self.args.log_level
             level = getattr(logging, log_level.upper()) if log_level else logging.INFO
 
-            # add file handler, info level
+            # add file and console handler
             file_handler = FileLoggingHandler()
             file_handler.setLevel(level)
             file_handler.setFormatter(
@@ -133,6 +133,9 @@ class OscarCommandRunner:
                     "%(asctime)s %(name)-12s %(process)d %(levelname)-8s %(message)s"
                 )
             )
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(level)
+            logging.getLogger().addHandler(console_handler)
             logging.getLogger().addHandler(file_handler)
 
             logging.getLogger("__main__").setLevel(level)
