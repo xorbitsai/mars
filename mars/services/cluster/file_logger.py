@@ -27,13 +27,16 @@ class FileLoggerActor(mo.Actor):
     """
 
     mars_temp_log = "MARS_TEMP_LOG"
+    prefix = "mars_"
+    mars_tmp_dir_prefix = "mars_tmp"
 
     def __init__(self):
         file_path = os.environ.get(self.mars_temp_log)
-        # mainly caused by test
+        # other situations: start cluster not from cmdline
         if file_path is None:
             logger.warning("Env {0} is not set!".format(self.mars_temp_log))
-            _, file_path = tempfile.mkstemp(prefix="mars_")
+            mars_tmp_dir = tempfile.mkdtemp(prefix=self.mars_tmp_dir_prefix)
+            _, file_path = tempfile.mkstemp(prefix=self.prefix, dir=mars_tmp_dir)
             os.environ[self.mars_temp_log] = file_path
         self._log_filename = file_path
 
@@ -79,17 +82,3 @@ class FileLoggerActor(mo.Actor):
                 res = f.read()
 
         return res
-
-    async def __pre_destroy__(self):
-        """
-        When this actor is going to be destroyed, delete the log file.
-        In the future, maybe we can upload these logs here to storage for further analysis.
-
-        Returns
-        -------
-
-        """
-        if os.path.exists(self._log_filename):
-            os.remove(self._log_filename)
-        else:
-            logger.warning("Cannot find log file {0}.".format(self._log_filename))

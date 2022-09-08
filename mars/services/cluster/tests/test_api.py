@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import os
+import shutil
 
 import pytest
 
@@ -29,6 +31,16 @@ async def actor_pool():
     pool = await mo.create_actor_pool("127.0.0.1", n_process=0)
     async with pool:
         yield pool
+
+    # clean
+    mars_temp_log = "MARS_TEMP_LOG"
+    filename = os.environ.get(mars_temp_log)
+    if filename is not None:
+        mars_tmp_dir = os.path.dirname(filename)
+        assert os.path.exists(filename)
+        assert os.path.exists(mars_tmp_dir)
+        shutil.rmtree(mars_tmp_dir)
+        assert not os.path.exists(mars_tmp_dir)
 
 
 class TestActor(mo.Actor):

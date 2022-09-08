@@ -320,8 +320,6 @@ class ClusterAPI(AbstractClusterAPI):
 
 
 class MockClusterAPI(ClusterAPI):
-    mars_temp_log = "MARS_TEMP_LOG"
-
     @classmethod
     async def create(cls: Type[APIType], address: str, **kw) -> APIType:
         from ..file_logger import FileLoggerActor

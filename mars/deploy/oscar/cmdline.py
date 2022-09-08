@@ -28,6 +28,7 @@ import psutil
 
 from ...utils import ensure_coverage
 from ..utils import load_service_config_file, get_third_party_modules_from_config
+from .file_logging_handler import FileLoggingHandler
 
 logger = logging.getLogger(__name__)
 _is_windows: bool = sys.platform.startswith("win")
@@ -89,11 +90,14 @@ class OscarCommandRunner:
             raise KeyError('"cluster" key is missing!')
         log_dir = cluster_config.get("log_dir")
         prefix = "mars_"
+        mars_tmp_dir_prefix = "mars_tmp"
         # default config, then create a temp file
         if log_dir is None or log_dir == "null":
-            _, file_path = tempfile.mkstemp(prefix=prefix)
+            mars_tmp_dir = tempfile.mkdtemp(prefix=mars_tmp_dir_prefix)
         else:
-            _, file_path = tempfile.mkstemp(prefix=prefix, dir=log_dir)
+            mars_tmp_dir = os.path.join(log_dir, mars_tmp_dir_prefix)
+            os.makedirs(mars_tmp_dir, exist_ok=True)
+        _, file_path = tempfile.mkstemp(prefix=prefix, dir=mars_tmp_dir)
         os.environ[self.mars_temp_log] = file_path
 
     def _get_logging_config_paths(self):
@@ -118,6 +122,19 @@ class OscarCommandRunner:
         else:
             log_level = self.args.log_level
             level = getattr(logging, log_level.upper()) if log_level else logging.INFO
+
+            # add file handler, info level
+            file_handler = FileLoggingHandler()
+            file_handler.setLevel(level)
+            file_handler.setFormatter(
+                logging.Formatter(self.args.log_format)
+                if self.args.log_format
+                else logging.Formatter(
+                    "%(asctime)s %(name)-12s %(process)d %(levelname)-8s %(message)s"
+                )
+            )
+            logging.getLogger().addHandler(file_handler)
+
             logging.getLogger("__main__").setLevel(level)
             logging.getLogger("mars").setLevel(level)
             self.logging_conf["level"] = level

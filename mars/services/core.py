@@ -17,6 +17,8 @@ import asyncio
 import enum
 import importlib
 import inspect
+import os
+import shutil
 import warnings
 from typing import Dict, Iterable, List, Union
 
@@ -185,6 +187,14 @@ async def stop_services(node_role: NodeRole, config: Dict, address: str = None):
         await asyncio.gather(*[inst.stop() for inst in instances])
 
     AbstractService.clear()
+
+    # clean mars temp dir
+    mars_temp_log = "MARS_TEMP_LOG"
+    logfile = os.environ.get(mars_temp_log)
+    if logfile is not None:
+        mars_tmp_dir = os.path.dirname(logfile)
+        if os.path.exists(mars_tmp_dir):
+            shutil.rmtree(mars_tmp_dir)
 
 
 async def create_service_session(
