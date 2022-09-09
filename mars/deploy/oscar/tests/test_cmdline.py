@@ -319,10 +319,11 @@ def init_app():
     assert os.path.exists(filename)
     mars_tmp_dir = os.path.dirname(filename)
     assert os.path.exists(mars_tmp_dir)
-
-    shutil.rmtree(mars_tmp_dir)
-    assert not os.path.exists(mars_tmp_dir)
-    assert not os.path.exists(mars_temp_log)
+    # on windows platform, cannot delete this dir
+    shutil.rmtree(mars_tmp_dir, ignore_errors=True)
+    if not sys.platform.startswith("win"):
+        assert not os.path.exists(mars_tmp_dir)
+        assert not os.path.exists(mars_temp_log)
 
 
 def test_parse_no_log_dir(init_app):

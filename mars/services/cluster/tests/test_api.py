@@ -14,6 +14,7 @@
 import asyncio
 import os
 import shutil
+import sys
 
 import pytest
 
@@ -39,8 +40,11 @@ async def actor_pool():
         mars_tmp_dir = os.path.dirname(filename)
         assert os.path.exists(filename)
         assert os.path.exists(mars_tmp_dir)
-        shutil.rmtree(mars_tmp_dir)
-        assert not os.path.exists(mars_tmp_dir)
+        # on windows platform, cannot delete this dir
+        shutil.rmtree(mars_tmp_dir, ignore_errors=True)
+        if not sys.platform.startswith("win"):
+            assert not os.path.exists(filename)
+            assert not os.path.exists(mars_tmp_dir)
 
 
 class TestActor(mo.Actor):
