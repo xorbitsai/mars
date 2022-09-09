@@ -102,8 +102,14 @@ async def test_api(actor_pool):
         role=NodeRole.WORKER, exclude_statuses={NodeStatus.STOPPED}
     )
 
-    assert "" == await api.get_node_log_content(size=10, address=pool_addr)
-    assert not await api.get_node_log_content(size=-1, address=pool_addr)
+    log_ref = await api._get_log_ref()
+    assert log_ref is not None
+
+    content = await api.get_node_log_content(size=10, address=pool_addr)
+    assert "" == content
+    content = await api.get_node_log_content(size=-1, address=pool_addr)
+    assert type(content) is str
+    assert "" == content
 
     await MockClusterAPI.cleanup(pool_addr)
 
@@ -150,14 +156,15 @@ async def test_web_api(actor_pool):
     stacks = await web_api.get_node_thread_stacks(pool_addr)
     assert len(stacks) > 0
 
-    log_content = await web_api.get_node_log_content(address=pool_addr)
+    log_content = await web_api.get_node_log_content(size=None, address=pool_addr)
     assert len(log_content) == 0
 
     log_content = await web_api.get_node_log_content(size=5, address=pool_addr)
     assert len(log_content) == 0
 
     log_content = await web_api.get_node_log_content(size=-1, address=pool_addr)
-    assert log_content
+    assert type(log_content) is str
+    assert len(log_content) == 0
 
     await MockClusterAPI.cleanup(pool_addr)
 

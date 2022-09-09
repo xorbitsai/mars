@@ -18,6 +18,7 @@ import glob
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -305,11 +306,38 @@ def test_parse_args():
     }
 
 
-def test_parse_log_dir():
-    mars_temp_log = "MARS_TEMP_LOG"
+@pytest.fixture
+def init_app():
     parser = argparse.ArgumentParser(description="TestService")
     app = WorkerCommandRunner()
     app.config_args(parser)
+    yield app, parser
+
+    # clean
+    mars_temp_log = "MARS_TEMP_LOG"
+    filename = os.environ.get(mars_temp_log)
+    assert os.path.exists(filename)
+    mars_tmp_dir = os.path.dirname(filename)
+    assert os.path.exists(mars_tmp_dir)
+
+    shutil.rmtree(mars_tmp_dir)
+    assert not os.path.exists(mars_tmp_dir)
+    assert not os.path.exists(mars_temp_log)
+
+
+def test_parse_no_log_dir(init_app):
+    mars_temp_log = "MARS_TEMP_LOG"
+    app, parser = init_app
+
+    assert not app.config
+    assert len(app.config) == 0
+
+    with pytest.raises(KeyError):
+        try:
+            app._set_log_file_env()
+        except ValueError:
+            pytest.fail()
+
     _ = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
     assert app.config["cluster"]
     assert not app.config["cluster"]["log_dir"]
@@ -317,10 +345,42 @@ def test_parse_log_dir():
     app._set_log_file_env()
     filename = os.environ.get(mars_temp_log)
     assert filename
-    _, file = os.path.split(filename)
+    path, file = os.path.split(filename)
     assert file.startswith("mars_")
-    os.remove(filename)
-    assert not os.path.exists(filename)
+    assert os.path.basename(path).startswith("mars_tmp")
+
+
+def test_parse_log_dir(init_app):
+    mars_temp_log = "MARS_TEMP_LOG"
+    app, parser = init_app
+    log_dir = tempfile.mkdtemp()
+    _ = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
+    app.config["cluster"]["log_dir"] = log_dir
+    assert os.path.exists(app.config["cluster"]["log_dir"])
+    assert not os.environ.get(mars_temp_log)
+    app._set_log_file_env()
+    filename = os.environ.get(mars_temp_log)
+    assert filename is not None
+    assert os.path.exists(filename)
+
+
+def test_config_logging(init_app):
+    from ..file_logging_handler import FileLoggingHandler
+
+    mars_temp_log = "MARS_TEMP_LOG"
+    app, parser = init_app
+    app.args = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
+    app.config_logging()
+    cnt = 0
+    file_handler = None
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, FileLoggingHandler):
+            cnt += 1
+            file_handler = handler
+    assert cnt == 1
+    assert file_handler is not None
+    assert file_handler.level == logging.INFO
+    assert file_handler.baseFilename == os.environ.get(mars_temp_log)
 
 
 def test_parse_third_party_modules():

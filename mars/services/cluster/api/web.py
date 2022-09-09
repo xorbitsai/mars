@@ -360,7 +360,7 @@ class WebClusterAPI(AbstractClusterAPI, MarsWebAPIClientMixin):
         elif size == -1:
             path = f"{self._address}/api/cluster/logs?address={address}&&size={size}&&filename=test.log"
             res = await self._request_url("GET", path)
-            return str(res.body)
+            return bytes.decode(res.body, encoding="utf8")
         else:
             path = f"{self._address}/api/cluster/logs?address={address}&&size={size}"
             res = await self._request_url("GET", path)
