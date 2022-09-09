@@ -17,6 +17,7 @@ import asyncio
 import enum
 import importlib
 import inspect
+import logging
 import os
 import shutil
 import warnings
@@ -194,6 +195,7 @@ async def stop_services(node_role: NodeRole, config: Dict, address: str = None):
     if logfile is not None:
         mars_tmp_dir = os.path.dirname(logfile)
         if os.path.exists(mars_tmp_dir):
+            logging.shutdown()
             shutil.rmtree(mars_tmp_dir)
 
 
