@@ -26,6 +26,8 @@ from ..api import ClusterAPI, MockClusterAPI, WebClusterAPI
 from ..api.web import web_handlers
 from ..core import NodeStatus
 
+_windows: bool = True if sys.platform.startswith("win") else False
+
 
 @pytest.fixture
 async def actor_pool():
@@ -41,8 +43,9 @@ async def actor_pool():
         assert os.path.exists(filename)
         assert os.path.exists(mars_tmp_dir)
         # on windows platform, cannot delete this dir
-        shutil.rmtree(mars_tmp_dir, ignore_errors=True)
-        if not sys.platform.startswith("win"):
+        ignore_errors = True if _windows else False
+        shutil.rmtree(mars_tmp_dir, ignore_errors=ignore_errors)
+        if not _windows:
             assert not os.path.exists(filename)
             assert not os.path.exists(mars_tmp_dir)
 

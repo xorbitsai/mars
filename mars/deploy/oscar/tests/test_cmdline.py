@@ -43,6 +43,7 @@ from ..supervisor import SupervisorCommandRunner
 
 
 logger = logging.getLogger(__name__)
+_windows: bool = True if sys.platform.startswith("win") else False
 
 
 class _ProcessExitedException(Exception):
@@ -320,8 +321,9 @@ def init_app():
     mars_tmp_dir = os.path.dirname(filename)
     assert os.path.exists(mars_tmp_dir)
     # on windows platform, cannot delete this dir
-    shutil.rmtree(mars_tmp_dir, ignore_errors=True)
-    if not sys.platform.startswith("win"):
+    ignore_errors = True if _windows else False
+    shutil.rmtree(mars_tmp_dir, ignore_errors=ignore_errors)
+    if not _windows:
         assert not os.path.exists(mars_tmp_dir)
         assert not os.path.exists(mars_temp_log)
 

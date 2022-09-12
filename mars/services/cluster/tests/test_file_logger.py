@@ -26,6 +26,7 @@ mars_temp_log = "MARS_TEMP_LOG"
 prefix = "mars_"
 mars_tmp_dir_prefix = "mars_tmp"
 full_content = "qwert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
+_windows: bool = sys.platform.startswith("win")
 
 
 @pytest.fixture
@@ -38,8 +39,9 @@ async def actor_pool():
     filename = os.environ.get(mars_temp_log)
     mars_tmp_dir = os.path.dirname(filename)
     # on windows platform, cannot delete this dir
-    shutil.rmtree(mars_tmp_dir, ignore_errors=True)
-    if not sys.platform.startswith("win"):
+    ignore_errors = True if _windows else False
+    shutil.rmtree(mars_tmp_dir, ignore_errors=ignore_errors)
+    if not _windows:
         assert not os.path.exists(mars_tmp_dir)
         assert not os.path.exists(filename)
 
@@ -75,9 +77,8 @@ async def test_file_logger_without_env(actor_pool, caplog):
     assert os.path.exists(filename)
     assert os.path.basename(filename).startswith("mars_")
     assert os.path.basename(os.path.dirname(filename)).startswith("mars_tmp")
-    with open(filename, "w") as f:
+    with open(filename, "w", newline="\n") as f:
         f.write(full_content)
-        f.close()
 
     byte_num = 5
     expected_data = ""
