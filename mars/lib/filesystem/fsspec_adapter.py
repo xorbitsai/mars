@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from typing import List, Iterator, Tuple, Union, BinaryIO, TextIO, Dict
+from urllib.parse import urlparse, urlunparse, ParseResult
 
 from fsspec import filesystem
 from fsspec.core import stringify_path
@@ -25,22 +26,23 @@ from .core import path_type
 class FsSpecAdapter(FileSystem):
     def __init__(self, scheme: str, **kwargs):
         self._fs = filesystem(scheme, **kwargs)
+        self._scheme = scheme
 
     @implements(FileSystem.cat)
     def cat(self, path: path_type) -> bytes:
-        return self._fs.cat_file(stringify_path(path))
+        return self._fs.cat_file(self._normalize_path(path))
 
     @implements(FileSystem.ls)
     def ls(self, path: path_type) -> List[path_type]:
         entries = []
-        for entry in self._fs.ls(stringify_path(path), detail=False):
+        for entry in self._fs.ls(self._normalize_path(path), detail=False):
             if isinstance(entry, Dict):
                 entries.append(entry.get("name"))
             elif isinstance(entry, str):
                 entries.append(entry)
             else:  # pragma: no cover
                 raise TypeError(f"Expect str or dict, but got {type(entry)}")
-        return entries
+        return self._append_scheme(entries)
 
     @implements(FileSystem.delete)
     def delete(self, path: path_type, recursive: bool = False):
@@ -48,7 +50,7 @@ class FsSpecAdapter(FileSystem):
 
     @implements(FileSystem.stat)
     def stat(self, path: path_type) -> Dict:
-        return self._fs.info(stringify_path(path))
+        return self._fs.info(self._normalize_path(path))
 
     @implements(FileSystem.rename)
     def rename(self, path: path_type, new_path: path_type):
@@ -60,15 +62,15 @@ class FsSpecAdapter(FileSystem):
 
     @implements(FileSystem.exists)
     def exists(self, path: path_type):
-        return self._fs.exists(stringify_path(path))
+        return self._fs.exists(self._normalize_path(path))
 
     @implements(FileSystem.isdir)
     def isdir(self, path: path_type) -> bool:
-        return self._fs.isdir(stringify_path(path))
+        return self._fs.isdir(self._normalize_path(path))
 
     @implements(FileSystem.isfile)
     def isfile(self, path: path_type) -> bool:
-        return self._fs.isfile(stringify_path(path))
+        return self._fs.isfile(self._normalize_path(path))
 
     @implements(FileSystem._isfilestore)
     def _isfilestore(self) -> bool:
@@ -76,14 +78,46 @@ class FsSpecAdapter(FileSystem):
 
     @implements(FileSystem.open)
     def open(self, path: path_type, mode: str = "rb") -> Union[BinaryIO, TextIO]:
-        return self._fs.open(stringify_path(path), mode=mode)
+        return self._fs.open(self._normalize_path(path), mode=mode)
 
     @implements(FileSystem.walk)
     def walk(self, path: path_type) -> Iterator[Tuple[str, List[str], List[str]]]:
-        raise NotImplementedError
+        for root, dirs, files in self._fs.walk(path):
+            yield self._append_scheme([root])[0], self._append_scheme(
+                dirs
+            ), self._append_scheme(files)
 
     @implements(FileSystem.glob)
     def glob(self, path: path_type, recursive: bool = False) -> List[path_type]:
         from ._glob import FileSystemGlob
 
-        return FileSystemGlob(self).glob(stringify_path(path), recursive=recursive)
+        return self._append_scheme(
+            FileSystemGlob(self).glob(self._normalize_path(path), recursive=recursive)
+        )
+
+    @staticmethod
+    def _normalize_path(path: path_type) -> str:
+        """
+        Stringify path and remove its scheme.
+        """
+        path_str = stringify_path(path)
+        parsed = urlparse(path_str)
+        if parsed.scheme:
+            return parsed.path
+        else:
+            return path_str
+
+    def _append_scheme(self, paths: List[path_type]) -> List[path_type]:
+        return [
+            urlunparse(
+                ParseResult(
+                    scheme=self._scheme,
+                    netloc="",
+                    path=path,
+                    params="",
+                    query="",
+                    fragment="",
+                )
+            )
+            for path in paths
+        ]
