@@ -103,7 +103,16 @@ class FsSpecAdapter(FileSystem):
         path_str = stringify_path(path)
         parsed = urlparse(path_str)
         if parsed.scheme:
-            return parsed.path
+            return urlunparse(
+                ParseResult(
+                    scheme="",
+                    netloc=parsed.netloc,
+                    path=parsed.path,
+                    params="",
+                    query="",
+                    fragment="",
+                )
+            )
         else:
             return path_str
 
