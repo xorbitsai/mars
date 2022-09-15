@@ -107,6 +107,20 @@ def test_fsspec_adapter():
     assert not adapter.isfile("dir")
     assert not adapter.isfile("non-existent.txt")
 
+    # walk
+    for root, dirs, files in adapter.walk("/"):
+        if root == "memory:":
+            assert dirs == ["memory:dir"]
+            assert files == ["memory:foo.txt", "memory:test.txt"]
+        elif root == "memory:/dir":
+            assert dirs == ["memory:subdir"]
+            assert files == ["memory:bar.txt"]
+        elif root == "memory:/dir/subdir":
+            assert len(dirs) == 0
+            assert files == ["memory:baz.txt"]
+        else:
+            pytest.fail(f"unexpected dir: {root}")
+
     # glob
     # the expected results come from built-in glob lib.
     expected = [
