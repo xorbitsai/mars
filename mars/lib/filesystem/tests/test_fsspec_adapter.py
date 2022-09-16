@@ -62,16 +62,16 @@ def test_fsspec_adapter():
     # ls
     entries = adapter.ls("/")
     assert 3 == len(entries)
-    assert "/test.txt" in entries
-    assert "/foo.txt" in entries
-    assert "/dir" in entries
+    assert "memory:/test.txt" in entries
+    assert "memory:/foo.txt" in entries
+    assert "memory:/dir" in entries
     entries = adapter.ls("dir")
     assert 2 == len(entries)
-    assert "/dir/bar.txt" in entries
-    assert "/dir/subdir" in entries
+    assert "memory:/dir/bar.txt" in entries
+    assert "memory:/dir/subdir" in entries
     entries = adapter.ls("test.txt")
     assert 1 == len(entries)
-    assert "/test.txt" in entries
+    assert "memory:/test.txt" in entries
     try:
         adapter.ls("non-existent.txt")
         pytest.fail()
@@ -107,37 +107,58 @@ def test_fsspec_adapter():
     assert not adapter.isfile("dir")
     assert not adapter.isfile("non-existent.txt")
 
+    # walk
+    for root, dirs, files in adapter.walk("/"):
+        if root == "memory:":
+            assert dirs == ["memory:dir"]
+            assert files == ["memory:foo.txt", "memory:test.txt"]
+        elif root == "memory:/dir":
+            assert dirs == ["memory:subdir"]
+            assert files == ["memory:bar.txt"]
+        elif root == "memory:/dir/subdir":
+            assert len(dirs) == 0
+            assert files == ["memory:baz.txt"]
+        else:
+            pytest.fail(f"unexpected dir: {root}")
+
     # glob
     # the expected results come from built-in glob lib.
     expected = [
-        "foo.txt",
-        "dir",
-        "dir/subdir",
-        "dir/subdir/baz.txt",
-        "dir/bar.txt",
-        "test.txt",
-    ].sort()
-    actual = adapter.glob("**", recursive=True).sort()
+        "memory:foo.txt",
+        "memory:dir",
+        "memory:dir/subdir",
+        "memory:dir/subdir/baz.txt",
+        "memory:dir/bar.txt",
+        "memory:test.txt",
+    ]
+    expected.sort()
+    actual = adapter.glob("**", recursive=True)
+    actual.sort()
     assert actual == expected
-    expected = ["foo.txt"]
+    expected = ["memory:foo.txt"]
     actual = adapter.glob("**/foo.txt", recursive=True)
     assert actual == expected
-    expected = ["dir/bar.txt"]
+    expected = ["memory:dir/bar.txt"]
     actual = adapter.glob("**/bar.txt", recursive=True)
     assert actual == expected
-    expected = ["dir/subdir/baz.txt"]
+    expected = ["memory:dir/subdir/baz.txt"]
     actual = adapter.glob("**/baz.txt", recursive=True)
     assert actual == expected
-    expected = ["dir/bar.txt", "dir/subdir/baz.txt"]
+    expected = ["memory:dir/bar.txt", "memory:dir/subdir/baz.txt"]
     actual = adapter.glob("**/ba[rz].txt", recursive=True)
     assert actual == expected
     actual = adapter.glob("**/ba?.txt", recursive=True)
     assert actual == expected
-    expected = ["foo.txt", "test.txt", "dir"].sort()
-    actual = adapter.glob("**", recursive=False).sort()
+    expected = ["memory:foo.txt", "memory:test.txt", "memory:dir"]
+    expected.sort()
+    actual = adapter.glob("**", recursive=False)
+    actual.sort()
     assert actual == expected
-    actual = adapter.glob("*", recursive=False).sort()
+    actual = adapter.glob("*", recursive=False)
+    actual.sort()
     assert actual == expected
-    expected = ["foo.txt", "test.txt"].sort()
-    actual = adapter.glob("*.txt", recursive=False).sort()
+    expected = ["memory:foo.txt", "memory:test.txt"]
+    expected.sort()
+    actual = adapter.glob("*.txt", recursive=False)
+    actual.sort()
     assert actual == expected
