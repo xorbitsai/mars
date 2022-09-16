@@ -18,7 +18,6 @@ import glob
 import json
 import logging
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -36,7 +35,7 @@ from ....services import NodeRole
 from ....services.cluster import ClusterAPI
 from ....session import new_session
 from ....tests import flaky
-from ....utils import get_next_port
+from ....utils import clean_mars_tmp_dir, get_next_port
 from ..cmdline import OscarCommandRunner
 from ..worker import WorkerCommandRunner
 from ..supervisor import SupervisorCommandRunner
@@ -316,16 +315,7 @@ def init_app():
 
     # clean
     mars_temp_log = "MARS_TEMP_LOG"
-    filename = os.environ.get(mars_temp_log)
-    assert os.path.exists(filename)
-    mars_tmp_dir = os.path.dirname(filename)
-    assert os.path.exists(mars_tmp_dir)
-    # on windows platform, cannot delete this dir
-    ignore_errors = True if _windows else False
-    shutil.rmtree(mars_tmp_dir, ignore_errors=ignore_errors)
-    if not _windows:
-        assert not os.path.exists(mars_tmp_dir)
-        assert not os.path.exists(mars_temp_log)
+    clean_mars_tmp_dir(mars_temp_log)
 
 
 def test_parse_no_log_dir(init_app):
@@ -360,7 +350,6 @@ def test_parse_log_dir(init_app):
     _ = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
     app.config["cluster"]["log_dir"] = log_dir
     assert os.path.exists(app.config["cluster"]["log_dir"])
-    assert not os.environ.get(mars_temp_log)
     app._set_log_file_env()
     filename = os.environ.get(mars_temp_log)
     assert filename is not None

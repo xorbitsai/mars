@@ -13,20 +13,18 @@
 # limitations under the License.
 import logging
 import os
-import shutil
-import sys
 import tempfile
 
 import pytest
 
-from .... import oscar as mo
 from ..file_logger import FileLoggerActor
+from .... import oscar as mo
+from ....utils import clean_mars_tmp_dir
 
 mars_temp_log = "MARS_TEMP_LOG"
 prefix = "mars_"
 mars_tmp_dir_prefix = "mars_tmp"
 full_content = "qwert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
-_windows: bool = sys.platform.startswith("win")
 
 
 @pytest.fixture
@@ -36,14 +34,7 @@ async def actor_pool():
         yield pool
 
     # clean
-    filename = os.environ.get(mars_temp_log)
-    mars_tmp_dir = os.path.dirname(filename)
-    # on windows platform, cannot delete this dir
-    ignore_errors = True if _windows else False
-    shutil.rmtree(mars_tmp_dir, ignore_errors=ignore_errors)
-    if not _windows:
-        assert not os.path.exists(mars_tmp_dir)
-        assert not os.path.exists(filename)
+    clean_mars_tmp_dir(mars_temp_log)
 
 
 @pytest.mark.asyncio

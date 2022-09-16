@@ -88,7 +88,7 @@ export default class NodeLogTab extends React.Component {
       this.props.endpoint, '_',
       this.getTimestamp().toString(), '_',
       'log.txt');
-    fetch(`api/cluster/logs?address=${this.props.endpoint}&&size=-1&&filename=${filename}`)
+    fetch(`api/cluster/logs?address=${this.props.endpoint}&&size=-1`)
       .then(res => res.blob().then(blob => {
         let a = document.createElement('a');
         let url = window.URL.createObjectURL(blob);

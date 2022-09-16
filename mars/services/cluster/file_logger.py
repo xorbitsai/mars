@@ -40,7 +40,7 @@ class FileLoggerActor(mo.Actor):
             os.environ[self.mars_temp_log] = file_path
         self._log_filename = file_path
 
-    def fetch_logs(self, size) -> str:
+    def fetch_logs(self, size: int) -> str:
         """
         Externally exposed interface.
 
@@ -56,7 +56,7 @@ class FileLoggerActor(mo.Actor):
         content = self._get_n_bytes_tail_file(size)
         return content
 
-    def _get_n_bytes_tail_file(self, bytes_num) -> str:
+    def _get_n_bytes_tail_file(self, bytes_num: int) -> str:
         """
         Read last n bytes of file.
 

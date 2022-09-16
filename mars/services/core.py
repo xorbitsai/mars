@@ -17,11 +17,10 @@ import asyncio
 import enum
 import importlib
 import inspect
-import os
-import shutil
-import sys
 import warnings
 from typing import Dict, Iterable, List, Union
+
+from ..utils import clean_mars_tmp_dir
 
 _ModulesType = Union[List, str, None]
 
@@ -191,13 +190,7 @@ async def stop_services(node_role: NodeRole, config: Dict, address: str = None):
 
     # clean mars temp dir
     mars_temp_log = "MARS_TEMP_LOG"
-    logfile = os.environ.get(mars_temp_log)
-    if logfile is not None:
-        mars_tmp_dir = os.path.dirname(logfile)
-        if os.path.exists(mars_tmp_dir):
-            # under windows, shutil.rmtree will raise permission error
-            ignore_err = True if sys.platform.startswith("win") else False
-            shutil.rmtree(mars_tmp_dir, ignore_errors=ignore_err)
+    clean_mars_tmp_dir(mars_temp_log)
 
 
 async def create_service_session(

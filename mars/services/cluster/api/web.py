@@ -167,15 +167,15 @@ class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
         cluster_api = await self._get_cluster_api()
         address = self.get_argument("address", "") or None
         # 10MB by default
+        # TODO chunk log for very large log file
         size = int(self.get_argument("size", str(10 * 1024 * 1024)))
         content = await cluster_api.get_node_log_content(size, address=address)
         if size != -1:
             self.write(json.dumps({"content": content}))
         # size == -1 means downloading the current file
         else:
-            filename = self.get_argument("filename", "mars_log.log")
             self.set_header("Content-Type", "application/octet-stream")
-            self.set_header("Content-Disposition", "attachment; filename=" + filename)
+            self.set_header("Content-Disposition", "attachment")
             self.write(content)
             await self.finish()
 
@@ -353,15 +353,11 @@ class WebClusterAPI(AbstractClusterAPI, MarsWebAPIClientMixin):
         return list(json.loads(res.body)["stacks"])
 
     async def get_node_log_content(self, size: int = None, address: str = None) -> str:
-        if size is None:
-            path = f"{self._address}/api/cluster/logs?address={address}"
-            res = await self._request_url("GET", path)
-            return str(json.loads(res.body)["content"])
-        elif size == -1:
-            path = f"{self._address}/api/cluster/logs?address={address}&&size={size}&&filename=test.log"
-            res = await self._request_url("GET", path)
-            return bytes.decode(res.body, encoding="utf8")
+        path = f"{self._address}/api/cluster/logs?address={address}"
+        if size is not None:
+            path += f"&&size={size}"
+        res = await self._request_url("GET", path)
+        if size == -1:
+            return res.body.decode(encoding="utf8")
         else:
-            path = f"{self._address}/api/cluster/logs?address={address}&&size={size}"
-            res = await self._request_url("GET", path)
             return str(json.loads(res.body)["content"])

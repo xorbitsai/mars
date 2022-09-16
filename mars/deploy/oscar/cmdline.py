@@ -14,6 +14,7 @@
 
 import argparse
 import asyncio
+import configparser
 import faulthandler
 import glob
 import importlib
@@ -26,9 +27,8 @@ from typing import List
 
 import psutil
 
-from ...utils import ensure_coverage
 from ..utils import load_service_config_file, get_third_party_modules_from_config
-from .file_logging_handler import FileLoggingHandler
+from ...utils import ensure_coverage
 
 logger = logging.getLogger(__name__)
 _is_windows: bool = sys.platform.startswith("win")
@@ -83,8 +83,6 @@ class OscarCommandRunner:
         )
 
     def _set_log_file_env(self):
-        if self.config is None:
-            raise ValueError("Read yml config failed!")
         cluster_config: dict = self.config.get("cluster")
         if cluster_config is None:
             raise KeyError('"cluster" key is missing!')
@@ -92,13 +90,37 @@ class OscarCommandRunner:
         prefix = "mars_"
         mars_tmp_dir_prefix = "mars_tmp"
         # default config, then create a temp file
-        if log_dir is None or log_dir == "null":
+        if log_dir is None:
             mars_tmp_dir = tempfile.mkdtemp(prefix=mars_tmp_dir_prefix)
         else:
             mars_tmp_dir = os.path.join(log_dir, mars_tmp_dir_prefix)
             os.makedirs(mars_tmp_dir, exist_ok=True)
         _, file_path = tempfile.mkstemp(prefix=prefix, dir=mars_tmp_dir)
         os.environ[self.mars_temp_log] = file_path
+
+    @staticmethod
+    def _parse_file_logging_config(
+        file_path: str, level: str, formatter: str = None
+    ) -> configparser.ConfigParser:
+        config = configparser.ConfigParser()
+        config.read(file_path)
+        logger_sections = [
+            "logger_main",
+            "logger_deploy",
+            "logger_oscar",
+            "logger_services",
+            "handler_stream_handler",
+            "handler_file_handler",
+        ]
+        all_sections = config.sections()
+        for section in logger_sections:
+            if section in all_sections:
+                config[section]["level"] = level.upper() if level else "INFO"
+
+        if formatter:
+            format_section = "formatter_formatter"
+            config[format_section]["format"] = formatter
+        return config
 
     def _get_logging_config_paths(self):
         import mars
@@ -109,41 +131,37 @@ class OscarCommandRunner:
             log_conf,
             os.path.join(os.path.abspath("."), log_conf),
             os.path.join(os.path.dirname(os.path.dirname(mars.__file__)), log_conf),
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "file-logging.conf"
+            ),
         ]
 
     def config_logging(self):
         self._set_log_file_env()
-        for conf_path in self._get_logging_config_paths():
+
+        # get level and format cmd line config
+        log_level = self.args.log_level
+        level = getattr(logging, log_level.upper()) if log_level else logging.INFO
+        self.logging_conf["level"] = level
+        formatter = self.args.log_format
+        if formatter:
+            self.logging_conf["format"] = formatter
+
+        config_paths = self._get_logging_config_paths()
+        for i, conf_path in enumerate(config_paths):
             if os.path.exists(conf_path):
                 self.logging_conf["file"] = conf_path
-                logging.config.fileConfig(conf_path, disable_existing_loggers=False)
+                # default log conf file
+                if i == len(config_paths) - 1:
+                    # bind user's level and format when using default log conf
+                    parser = self._parse_file_logging_config(
+                        conf_path, log_level, formatter
+                    )
+                    logging.config.fileConfig(parser, disable_existing_loggers=False)
+                else:
+                    logging.config.fileConfig(conf_path, disable_existing_loggers=False)
                 logger.debug("Use logging config file at %s", conf_path)
                 break
-        else:
-            log_level = self.args.log_level
-            level = getattr(logging, log_level.upper()) if log_level else logging.INFO
-
-            # add file and console handler
-            file_handler = FileLoggingHandler()
-            file_handler.setLevel(level)
-            file_handler.setFormatter(
-                logging.Formatter(self.args.log_format)
-                if self.args.log_format
-                else logging.Formatter(
-                    "%(asctime)s %(name)-12s %(process)d %(levelname)-8s %(message)s"
-                )
-            )
-            console_handler = logging.StreamHandler()
-            console_handler.setLevel(level)
-            logging.getLogger().addHandler(console_handler)
-            logging.getLogger().addHandler(file_handler)
-
-            logging.getLogger("__main__").setLevel(level)
-            logging.getLogger("mars").setLevel(level)
-            self.logging_conf["level"] = level
-            if self.args.log_format:
-                logging.basicConfig(format=self.args.log_format)
-                self.logging_conf["format"] = self.args.log_format
 
     @classmethod
     def _build_endpoint_file_path(cls, pid: int = None, asterisk: bool = False):

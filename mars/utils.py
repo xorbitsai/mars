@@ -27,6 +27,7 @@ import logging
 import numbers
 import operator
 import os
+import shutil
 import weakref
 
 import cloudpickle as pickle
@@ -1766,3 +1767,17 @@ def retry_callable(
             raise ex  # pylint: disable-msg=E0702
 
     return retry_call
+
+
+def clean_mars_tmp_dir(mars_log_env_key: str = None):
+    # clean
+    mars_temp_log = mars_log_env_key or "MARS_TEMP_LOG"
+    filename = os.environ.get(mars_temp_log)
+    if filename is not None:
+        os.environ.pop(mars_temp_log)
+        if os.path.exists(filename):
+            mars_tmp_dir = os.path.dirname(filename)
+            if os.path.exists(mars_tmp_dir):
+                # on windows platform, raise Permission Error
+                _windows: bool = sys.platform.startswith("win")
+                shutil.rmtree(mars_tmp_dir, ignore_errors=_windows)

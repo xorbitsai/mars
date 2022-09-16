@@ -12,21 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import os
-import shutil
-import sys
 
 import pytest
 
-from .... import oscar as mo
-from ....utils import get_next_port
-from ... import NodeRole
-from ...web.supervisor import WebSupervisorService
 from ..api import ClusterAPI, MockClusterAPI, WebClusterAPI
 from ..api.web import web_handlers
 from ..core import NodeStatus
-
-_windows: bool = True if sys.platform.startswith("win") else False
+from ... import NodeRole
+from ...web.supervisor import WebSupervisorService
+from .... import oscar as mo
+from ....utils import clean_mars_tmp_dir, get_next_port
 
 
 @pytest.fixture
@@ -37,17 +32,7 @@ async def actor_pool():
 
     # clean
     mars_temp_log = "MARS_TEMP_LOG"
-    filename = os.environ.get(mars_temp_log)
-    if filename is not None:
-        mars_tmp_dir = os.path.dirname(filename)
-        assert os.path.exists(filename)
-        assert os.path.exists(mars_tmp_dir)
-        # on windows platform, cannot delete this dir
-        ignore_errors = True if _windows else False
-        shutil.rmtree(mars_tmp_dir, ignore_errors=ignore_errors)
-        if not _windows:
-            assert not os.path.exists(filename)
-            assert not os.path.exists(mars_tmp_dir)
+    clean_mars_tmp_dir(mars_temp_log)
 
 
 class TestActor(mo.Actor):
