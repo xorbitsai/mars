@@ -42,7 +42,6 @@ from ..supervisor import SupervisorCommandRunner
 
 
 logger = logging.getLogger(__name__)
-_windows: bool = True if sys.platform.startswith("win") else False
 
 
 class _ProcessExitedException(Exception):
