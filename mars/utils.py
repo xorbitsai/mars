@@ -1769,7 +1769,7 @@ def retry_callable(
     return retry_call
 
 
-def get_mars_log_env_keys() -> tuple[str, str, str]:
+def get_mars_log_env_keys() -> Tuple[str, str, str]:
     mars_log_path_key = "MARS_LOG_PATH"
     mars_log_prefix = "mars_"
     mars_tmp_dir_prefix = "mars_tmp"
