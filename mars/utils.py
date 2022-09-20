@@ -111,7 +111,7 @@ if sys.platform.startswith("win"):
 
 
 try:
-    from pandas._libs.lib import NoDefault, no_default
+    from pandas.api.extensions import no_default
 except ImportError:  # pragma: no cover
 
     class NoDefault(enum.Enum):
