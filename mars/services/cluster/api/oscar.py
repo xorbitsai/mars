@@ -314,7 +314,7 @@ class ClusterAPI(AbstractClusterAPI):
             FileLoggerActor.default_uid(), address=address or self._address
         )
 
-    async def get_node_log_content(self, size: int = None, address: str = None) -> str:
+    async def fetch_node_log(self, size: int = None, address: str = None) -> str:
         ref = await self._get_log_ref(address)
         return await ref.fetch_logs(size)
 

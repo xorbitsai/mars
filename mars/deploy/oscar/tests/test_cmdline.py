@@ -35,13 +35,15 @@ from ....services import NodeRole
 from ....services.cluster import ClusterAPI
 from ....session import new_session
 from ....tests import flaky
-from ....utils import clean_mars_tmp_dir, get_next_port
+from ....utils import clean_mars_tmp_dir, get_next_port, get_mars_log_env_keys
 from ..cmdline import OscarCommandRunner
 from ..worker import WorkerCommandRunner
 from ..supervisor import SupervisorCommandRunner
 
 
 logger = logging.getLogger(__name__)
+
+mars_temp_log, mars_log_prefix, mars_tmp_dir_prefix = get_mars_log_env_keys()
 
 
 class _ProcessExitedException(Exception):
@@ -313,12 +315,10 @@ def init_app():
     yield app, parser
 
     # clean
-    mars_temp_log = "MARS_TEMP_LOG"
-    clean_mars_tmp_dir(mars_temp_log)
+    clean_mars_tmp_dir()
 
 
 def test_parse_no_log_dir(init_app):
-    mars_temp_log = "MARS_TEMP_LOG"
     app, parser = init_app
 
     assert not app.config
@@ -338,12 +338,11 @@ def test_parse_no_log_dir(init_app):
     filename = os.environ.get(mars_temp_log)
     assert filename
     path, file = os.path.split(filename)
-    assert file.startswith("mars_")
-    assert os.path.basename(path).startswith("mars_tmp")
+    assert file.startswith(mars_log_prefix)
+    assert os.path.basename(path).startswith(mars_tmp_dir_prefix)
 
 
 def test_parse_log_dir(init_app):
-    mars_temp_log = "MARS_TEMP_LOG"
     app, parser = init_app
     log_dir = tempfile.mkdtemp()
     _ = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
@@ -358,7 +357,6 @@ def test_parse_log_dir(init_app):
 def test_config_logging(init_app):
     from ..file_logging_handler import FileLoggingHandler
 
-    mars_temp_log = "MARS_TEMP_LOG"
     app, parser = init_app
     app.args = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
     app.config_logging()

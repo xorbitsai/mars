@@ -19,11 +19,9 @@ import pytest
 
 from ..file_logger import FileLoggerActor
 from .... import oscar as mo
-from ....utils import clean_mars_tmp_dir
+from ....utils import clean_mars_tmp_dir, get_mars_log_env_keys
 
-mars_temp_log = "MARS_TEMP_LOG"
-prefix = "mars_"
-mars_tmp_dir_prefix = "mars_tmp"
+mars_temp_log, prefix, mars_tmp_dir_prefix = get_mars_log_env_keys()
 full_content = "qwert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
 
 
@@ -34,7 +32,7 @@ async def actor_pool():
         yield pool
 
     # clean
-    clean_mars_tmp_dir(mars_temp_log)
+    clean_mars_tmp_dir()
 
 
 @pytest.mark.asyncio
@@ -66,8 +64,8 @@ async def test_file_logger_without_env(actor_pool, caplog):
     filename = os.environ.get(mars_temp_log)
     assert filename is not None
     assert os.path.exists(filename)
-    assert os.path.basename(filename).startswith("mars_")
-    assert os.path.basename(os.path.dirname(filename)).startswith("mars_tmp")
+    assert os.path.basename(filename).startswith(prefix)
+    assert os.path.basename(os.path.dirname(filename)).startswith(mars_tmp_dir_prefix)
     with open(filename, "w", newline="\n") as f:
         f.write(full_content)
 

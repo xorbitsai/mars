@@ -16,6 +16,7 @@ import os
 import tempfile
 
 from mars import oscar as mo
+from ...utils import get_mars_log_env_keys
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,7 @@ class FileLoggerActor(mo.Actor):
     Expose interface for web frontend to fetch log content.
     """
 
-    mars_temp_log = "MARS_TEMP_LOG"
-    prefix = "mars_"
-    mars_tmp_dir_prefix = "mars_tmp"
+    mars_temp_log, prefix, mars_tmp_dir_prefix = get_mars_log_env_keys()
 
     def __init__(self):
         file_path = os.environ.get(self.mars_temp_log)

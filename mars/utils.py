@@ -1769,9 +1769,16 @@ def retry_callable(
     return retry_call
 
 
-def clean_mars_tmp_dir(mars_log_env_key: str = None):
+def get_mars_log_env_keys() -> tuple[str, str, str]:
+    mars_log_path_key = "MARS_LOG_PATH"
+    mars_log_prefix = "mars_"
+    mars_tmp_dir_prefix = "mars_tmp"
+    return mars_log_path_key, mars_log_prefix, mars_tmp_dir_prefix
+
+
+def clean_mars_tmp_dir():
     # clean
-    mars_temp_log = mars_log_env_key or "MARS_TEMP_LOG"
+    mars_temp_log, _, _ = get_mars_log_env_keys()
     filename = os.environ.get(mars_temp_log)
     if filename is not None:
         os.environ.pop(mars_temp_log)

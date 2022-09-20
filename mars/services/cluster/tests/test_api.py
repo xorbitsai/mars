@@ -31,8 +31,7 @@ async def actor_pool():
         yield pool
 
     # clean
-    mars_temp_log = "MARS_TEMP_LOG"
-    clean_mars_tmp_dir(mars_temp_log)
+    clean_mars_tmp_dir()
 
 
 class TestActor(mo.Actor):
@@ -97,9 +96,9 @@ async def test_api(actor_pool):
     log_ref = await api._get_log_ref()
     assert log_ref is not None
 
-    content = await api.get_node_log_content(size=10, address=pool_addr)
+    content = await api.fetch_node_log(size=10, address=pool_addr)
     assert "" == content
-    content = await api.get_node_log_content(size=-1, address=pool_addr)
+    content = await api.fetch_node_log(size=-1, address=pool_addr)
     assert type(content) is str
     assert "" == content
 
@@ -148,13 +147,13 @@ async def test_web_api(actor_pool):
     stacks = await web_api.get_node_thread_stacks(pool_addr)
     assert len(stacks) > 0
 
-    log_content = await web_api.get_node_log_content(size=None, address=pool_addr)
+    log_content = await web_api.fetch_node_log(size=None, address=pool_addr)
     assert len(log_content) == 0
 
-    log_content = await web_api.get_node_log_content(size=5, address=pool_addr)
+    log_content = await web_api.fetch_node_log(size=5, address=pool_addr)
     assert len(log_content) == 0
 
-    log_content = await web_api.get_node_log_content(size=-1, address=pool_addr)
+    log_content = await web_api.fetch_node_log(size=-1, address=pool_addr)
     assert type(log_content) is str
     assert len(log_content) == 0
 

@@ -163,13 +163,13 @@ class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
         )
 
     @web_api("logs", method="get", cache_blocking=True)
-    async def get_node_log(self):
+    async def fetch_node_log(self):
         cluster_api = await self._get_cluster_api()
         address = self.get_argument("address", "") or None
         # 10MB by default
         # TODO chunk log for very large log file
         size = int(self.get_argument("size", str(10 * 1024 * 1024)))
-        content = await cluster_api.get_node_log_content(size, address=address)
+        content = await cluster_api.fetch_node_log(size, address=address)
         if size != -1:
             self.write(json.dumps({"content": content}))
         # size == -1 means downloading the current file
@@ -352,7 +352,7 @@ class WebClusterAPI(AbstractClusterAPI, MarsWebAPIClientMixin):
         res = await self._request_url("GET", path)
         return list(json.loads(res.body)["stacks"])
 
-    async def get_node_log_content(self, size: int = None, address: str = None) -> str:
+    async def fetch_node_log(self, size: int = None, address: str = None) -> str:
         path = f"{self._address}/api/cluster/logs?address={address}"
         if size is not None:
             path += f"&&size={size}"

@@ -14,9 +14,11 @@
 import logging
 import os
 
+from ...utils import get_mars_log_env_keys
+
 
 class FileLoggingHandler(logging.FileHandler):
-    mars_temp_log = "MARS_TEMP_LOG"
+    mars_temp_log, _, _ = get_mars_log_env_keys()
 
     def __init__(self):
         file_name = os.environ.get(self.mars_temp_log)

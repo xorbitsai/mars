@@ -189,8 +189,7 @@ async def stop_services(node_role: NodeRole, config: Dict, address: str = None):
     AbstractService.clear()
 
     # clean mars temp dir
-    mars_temp_log = "MARS_TEMP_LOG"
-    clean_mars_tmp_dir(mars_temp_log)
+    clean_mars_tmp_dir()
 
 
 async def create_service_session(
