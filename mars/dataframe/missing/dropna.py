@@ -21,6 +21,7 @@ from ... import opcodes
 from ...core import OutputType, recursive_tile
 from ...config import options
 from ...serialization.serializables import AnyField, BoolField, StringField, Int32Field
+from ...utils import no_default
 from ..align import align_dataframe_series
 from ..operands import DataFrameOperand, DataFrameOperandMixin
 from ..utils import parse_index, validate_axis
@@ -197,7 +198,7 @@ class DataFrameDropNA(DataFrameOperand, DataFrameOperandMixin):
             if op.how == "all":
                 in_counts = in_counts[in_counts > 0]
             else:
-                thresh = op.subset_size if op.thresh is None else op.thresh
+                thresh = op.subset_size if op.thresh is no_default else op.thresh
                 in_counts = in_counts[in_counts >= thresh]
 
             ctx[op.outputs[0].key] = in_data.reindex(in_counts.index)
@@ -205,7 +206,7 @@ class DataFrameDropNA(DataFrameOperand, DataFrameOperandMixin):
             pd.reset_option("mode.use_inf_as_na")
 
 
-def df_dropna(df, axis=0, how="any", thresh=None, subset=None, inplace=False):
+def df_dropna(df, axis=0, how="any", thresh=no_default, subset=None, inplace=False):
     """
     Remove missing values.
 
