@@ -30,20 +30,19 @@ import psutil
 import pytest
 
 from .... import tensor as mt
+from ....constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
 from ....lib.aio import new_isolation, get_isolation, stop_isolation
 from ....services import NodeRole
 from ....services.cluster import ClusterAPI
 from ....session import new_session
 from ....tests import flaky
-from ....utils import clean_mars_tmp_dir, get_next_port, get_mars_log_env_keys
+from ....utils import clean_mars_tmp_dir, get_next_port
 from ..cmdline import OscarCommandRunner
 from ..worker import WorkerCommandRunner
 from ..supervisor import SupervisorCommandRunner
 
 
 logger = logging.getLogger(__name__)
-
-mars_temp_log, mars_log_prefix, mars_tmp_dir_prefix = get_mars_log_env_keys()
 
 
 class _ProcessExitedException(Exception):
@@ -333,13 +332,13 @@ def test_parse_no_log_dir(init_app):
     _ = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
     assert app.config["cluster"]
     assert not app.config["cluster"]["log_dir"]
-    assert not os.environ.get(mars_temp_log)
+    assert not os.environ.get(MARS_LOG_PATH_KEY)
     app._set_log_file_env()
-    filename = os.environ.get(mars_temp_log)
+    filename = os.environ.get(MARS_LOG_PATH_KEY)
     assert filename
     path, file = os.path.split(filename)
-    assert file.startswith(mars_log_prefix)
-    assert os.path.basename(path).startswith(mars_tmp_dir_prefix)
+    assert file.startswith(MARS_LOG_PREFIX)
+    assert os.path.basename(path).startswith(MARS_TMP_DIR_PREFIX)
 
 
 def test_parse_log_dir(init_app):
@@ -349,7 +348,7 @@ def test_parse_log_dir(init_app):
     app.config["cluster"]["log_dir"] = log_dir
     assert os.path.exists(app.config["cluster"]["log_dir"])
     app._set_log_file_env()
-    filename = os.environ.get(mars_temp_log)
+    filename = os.environ.get(MARS_LOG_PATH_KEY)
     assert filename is not None
     assert os.path.exists(filename)
 
@@ -369,7 +368,7 @@ def test_config_logging(init_app):
     assert cnt == 1
     assert file_handler is not None
     assert file_handler.level == logging.INFO
-    assert file_handler.baseFilename == os.environ.get(mars_temp_log)
+    assert file_handler.baseFilename == os.environ.get(MARS_LOG_PATH_KEY)
 
 
 def test_parse_third_party_modules():

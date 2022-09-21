@@ -16,7 +16,7 @@ import os
 import tempfile
 
 from mars import oscar as mo
-from ...utils import get_mars_log_env_keys
+from ...constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +27,14 @@ class FileLoggerActor(mo.Actor):
     Expose interface for web frontend to fetch log content.
     """
 
-    mars_temp_log, prefix, mars_tmp_dir_prefix = get_mars_log_env_keys()
-
     def __init__(self):
-        file_path = os.environ.get(self.mars_temp_log)
+        file_path = os.environ.get(MARS_LOG_PATH_KEY)
         # other situations: start cluster not from cmdline
         if file_path is None:
-            logger.warning("Env {0} is not set!".format(self.mars_temp_log))
-            mars_tmp_dir = tempfile.mkdtemp(prefix=self.mars_tmp_dir_prefix)
-            _, file_path = tempfile.mkstemp(prefix=self.prefix, dir=mars_tmp_dir)
-            os.environ[self.mars_temp_log] = file_path
+            logger.warning("Env {0} is not set!".format(MARS_LOG_PATH_KEY))
+            mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
+            _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
+            os.environ[MARS_LOG_PATH_KEY] = file_path
         self._log_filename = file_path
 
     def fetch_logs(self, size: int) -> str:

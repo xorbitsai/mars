@@ -28,7 +28,6 @@ from .core import AbstractClusterAPI
 
 class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
     _root_pattern = "/api/cluster"
-    mars_log_file_env = "MARS_TEMP_LOG"
 
     @alru_cache(cache_exceptions=False)
     async def _get_cluster_api(self):

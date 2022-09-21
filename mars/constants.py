@@ -1,5 +1,3 @@
-# Copyright 2022 XProbe Inc.
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -11,15 +9,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
-import os
 
-from ...constants import MARS_LOG_PATH_KEY
-
-
-class FileLoggingHandler(logging.FileHandler):
-
-    def __init__(self):
-        file_name = os.environ.get(MARS_LOG_PATH_KEY)
-
-        super(FileLoggingHandler, self).__init__(file_name, "a")
+# Env key for Mars log absolute path
+MARS_LOG_PATH_KEY = 'MARS_LOG_PATH'
+# Mars log file name prefix
+MARS_LOG_PREFIX = 'mars_'
+# The prefix of the temporary directory where the Mars log is located
+MARS_TMP_DIR_PREFIX = 'mars_tmp'

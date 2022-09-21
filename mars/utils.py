@@ -62,6 +62,7 @@ from urllib.parse import urlparse
 import numpy as np
 import pandas as pd
 
+from .constants import MARS_LOG_PATH_KEY
 from ._utils import (  # noqa: F401 # pylint: disable=unused-import
     to_binary,
     to_str,
@@ -1769,19 +1770,11 @@ def retry_callable(
     return retry_call
 
 
-def get_mars_log_env_keys() -> Tuple[str, str, str]:
-    mars_log_path_key = "MARS_LOG_PATH"
-    mars_log_prefix = "mars_"
-    mars_tmp_dir_prefix = "mars_tmp"
-    return mars_log_path_key, mars_log_prefix, mars_tmp_dir_prefix
-
-
 def clean_mars_tmp_dir():
-    # clean
-    mars_temp_log, _, _ = get_mars_log_env_keys()
-    filename = os.environ.get(mars_temp_log)
+    # clean Mars log file and Mars tmp dir
+    filename = os.environ.get(MARS_LOG_PATH_KEY)
     if filename is not None:
-        os.environ.pop(mars_temp_log)
+        os.environ.pop(MARS_LOG_PATH_KEY)
         if os.path.exists(filename):
             mars_tmp_dir = os.path.dirname(filename)
             if os.path.exists(mars_tmp_dir):

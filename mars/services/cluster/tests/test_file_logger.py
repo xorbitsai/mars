@@ -19,9 +19,9 @@ import pytest
 
 from ..file_logger import FileLoggerActor
 from .... import oscar as mo
-from ....utils import clean_mars_tmp_dir, get_mars_log_env_keys
+from ....constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
+from ....utils import clean_mars_tmp_dir
 
-mars_temp_log, prefix, mars_tmp_dir_prefix = get_mars_log_env_keys()
 full_content = "qwert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
 
 
@@ -38,9 +38,9 @@ async def actor_pool():
 @pytest.mark.asyncio
 async def test_file_logger_with_env(actor_pool, caplog):
     # prepare
-    mars_tmp_dir = tempfile.mkdtemp(prefix=mars_tmp_dir_prefix)
-    _, file_path = tempfile.mkstemp(prefix=prefix, dir=mars_tmp_dir)
-    os.environ[mars_temp_log] = file_path
+    mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
+    _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
+    os.environ[MARS_LOG_PATH_KEY] = file_path
 
     pool_addr = actor_pool.external_address
     _ = await mo.create_actor(
@@ -61,11 +61,11 @@ async def test_file_logger_without_env(actor_pool, caplog):
             address=pool_addr,
         )
 
-    filename = os.environ.get(mars_temp_log)
+    filename = os.environ.get(MARS_LOG_PATH_KEY)
     assert filename is not None
     assert os.path.exists(filename)
-    assert os.path.basename(filename).startswith(prefix)
-    assert os.path.basename(os.path.dirname(filename)).startswith(mars_tmp_dir_prefix)
+    assert os.path.basename(filename).startswith(MARS_LOG_PREFIX)
+    assert os.path.basename(os.path.dirname(filename)).startswith(MARS_TMP_DIR_PREFIX)
     with open(filename, "w", newline="\n") as f:
         f.write(full_content)
 

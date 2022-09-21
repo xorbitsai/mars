@@ -28,7 +28,8 @@ from typing import List
 import psutil
 
 from ..utils import load_service_config_file, get_third_party_modules_from_config
-from ...utils import ensure_coverage, get_mars_log_env_keys
+from ...constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
+from ...utils import ensure_coverage
 
 logger = logging.getLogger(__name__)
 _is_windows: bool = sys.platform.startswith("win")
@@ -39,7 +40,6 @@ class OscarCommandRunner:
     command_description = None
     node_role = None
     _port_file_prefix = "mars_service_process"
-    mars_temp_log, prefix, mars_tmp_dir_prefix = get_mars_log_env_keys()
 
     def __init__(self):
         faulthandler.enable()
@@ -89,12 +89,12 @@ class OscarCommandRunner:
         log_dir = cluster_config.get("log_dir")
         # default config, then create a temp file
         if log_dir is None:
-            mars_tmp_dir = tempfile.mkdtemp(prefix=self.mars_tmp_dir_prefix)
+            mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
         else:
-            mars_tmp_dir = os.path.join(log_dir, self.mars_tmp_dir_prefix)
+            mars_tmp_dir = os.path.join(log_dir, MARS_TMP_DIR_PREFIX)
             os.makedirs(mars_tmp_dir, exist_ok=True)
-        _, file_path = tempfile.mkstemp(prefix=self.prefix, dir=mars_tmp_dir)
-        os.environ[self.mars_temp_log] = file_path
+        _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
+        os.environ[MARS_LOG_PATH_KEY] = file_path
 
     @staticmethod
     def _parse_file_logging_config(
