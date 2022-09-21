@@ -18,7 +18,6 @@ from ...constants import MARS_LOG_PATH_KEY
 
 
 class FileLoggingHandler(logging.FileHandler):
-
     def __init__(self):
         file_name = os.environ.get(MARS_LOG_PATH_KEY)
 
