@@ -65,6 +65,7 @@ class WebActor(mo.Actor):
                 if port is None:
                     port = get_next_port()
 
+                # For debugging tornado, use debug=True to enable hot deploy
                 self._web_app = web.Application(handlers)
                 self._web_server = self._web_app.listen(port, host)
                 logger.info("Mars Web started at %s:%d", host, port)

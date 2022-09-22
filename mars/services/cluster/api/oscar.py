@@ -307,10 +307,22 @@ class ClusterAPI(AbstractClusterAPI):
         ref = await self._get_process_info_manager_ref(address)
         return await ref.get_thread_stacks()
 
+    async def _get_log_ref(self, address: str = None):
+        from ..file_logger import FileLoggerActor
+
+        return await mo.actor_ref(
+            FileLoggerActor.default_uid(), address=address or self._address
+        )
+
+    async def fetch_node_log(self, size: int = None, address: str = None) -> str:
+        ref = await self._get_log_ref(address)
+        return await ref.fetch_logs(size)
+
 
 class MockClusterAPI(ClusterAPI):
     @classmethod
     async def create(cls: Type[APIType], address: str, **kw) -> APIType:
+        from ..file_logger import FileLoggerActor
         from ..procinfo import ProcessInfoManagerActor
         from ..supervisor.locator import SupervisorPeerLocatorActor
         from ..supervisor.node_allocator import NodeAllocatorActor
@@ -351,6 +363,9 @@ class MockClusterAPI(ClusterAPI):
                 uid=ProcessInfoManagerActor.default_uid(),
                 address=address,
             ),
+            mo.create_actor(
+                FileLoggerActor, uid=FileLoggerActor.default_uid(), address=address
+            ),
         ]
         dones, _ = await asyncio.wait(
             [asyncio.ensure_future(coro) for coro in create_actor_coros]
@@ -368,6 +383,7 @@ class MockClusterAPI(ClusterAPI):
 
     @classmethod
     async def cleanup(cls, address: str):
+        from ..file_logger import FileLoggerActor
         from ..supervisor.locator import SupervisorPeerLocatorActor
         from ..uploader import NodeInfoUploaderActor
         from ..supervisor.node_info import NodeInfoCollectorActor
@@ -387,5 +403,8 @@ class MockClusterAPI(ClusterAPI):
                 mo.create_actor_ref(
                     uid=NodeInfoUploaderActor.default_uid(), address=address
                 )
+            ),
+            mo.destroy_actor(
+                mo.create_actor_ref(uid=FileLoggerActor.default_uid(), address=address)
             ),
         )

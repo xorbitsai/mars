@@ -27,6 +27,7 @@ import logging
 import numbers
 import operator
 import os
+import shutil
 import weakref
 
 import cloudpickle as pickle
@@ -61,6 +62,7 @@ from urllib.parse import urlparse
 import numpy as np
 import pandas as pd
 
+from .constants import MARS_LOG_PATH_KEY
 from ._utils import (  # noqa: F401 # pylint: disable=unused-import
     to_binary,
     to_str,
@@ -1766,3 +1768,16 @@ def retry_callable(
             raise ex  # pylint: disable-msg=E0702
 
     return retry_call
+
+
+def clean_mars_tmp_dir():
+    # clean Mars log file and Mars tmp dir
+    filename = os.environ.get(MARS_LOG_PATH_KEY)
+    if filename is not None:
+        os.environ.pop(MARS_LOG_PATH_KEY)
+        if os.path.exists(filename):
+            mars_tmp_dir = os.path.dirname(filename)
+            if os.path.exists(mars_tmp_dir):
+                # on windows platform, raise Permission Error
+                _windows: bool = sys.platform.startswith("win")
+                shutil.rmtree(mars_tmp_dir, ignore_errors=_windows)

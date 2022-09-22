@@ -26,6 +26,7 @@ import { useStyles } from '../Style';
 import NodeEnvTab from './NodeEnvTab';
 import NodeResourceTab from './NodeResourceTab';
 import NodeStackTab from './NodeStackTab';
+import NodeLogTab from './NodeLogTab';
 
 
 export default function WorkerDetailPage(props) {
@@ -48,6 +49,7 @@ export default function WorkerDetailPage(props) {
             <Tab label="Environment" />
             <Tab label="Resources" />
             <Tab label="Stacks" />
+            <Tab label="Logs" />
           </Tabs>
           <TabPanel value={value} index={0}>
             <NodeEnvTab endpoint={props.endpoint} />
@@ -57,6 +59,9 @@ export default function WorkerDetailPage(props) {
           </TabPanel>
           <TabPanel value={value} index={2}>
             <NodeStackTab endpoint={props.endpoint} />
+          </TabPanel>
+          <TabPanel value={value} index={3}>
+            <NodeLogTab endpoint={props.endpoint} role="worker"/>
           </TabPanel>
         </Paper>
       </Grid>

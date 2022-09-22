@@ -11,18 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import asyncio
 
 import pytest
 
-from .... import oscar as mo
-from ....utils import get_next_port
-from ... import NodeRole
-from ...web.supervisor import WebSupervisorService
 from ..api import ClusterAPI, MockClusterAPI, WebClusterAPI
 from ..api.web import web_handlers
 from ..core import NodeStatus
+from ... import NodeRole
+from ...web.supervisor import WebSupervisorService
+from .... import oscar as mo
+from ....utils import clean_mars_tmp_dir, get_next_port
 
 
 @pytest.fixture
@@ -30,6 +29,9 @@ async def actor_pool():
     pool = await mo.create_actor_pool("127.0.0.1", n_process=0)
     async with pool:
         yield pool
+
+    # clean
+    clean_mars_tmp_dir()
 
 
 class TestActor(mo.Actor):
@@ -91,6 +93,15 @@ async def test_api(actor_pool):
         role=NodeRole.WORKER, exclude_statuses={NodeStatus.STOPPED}
     )
 
+    log_ref = await api._get_log_ref()
+    assert log_ref is not None
+
+    content = await api.fetch_node_log(size=10, address=pool_addr)
+    assert "" == content
+    content = await api.fetch_node_log(size=-1, address=pool_addr)
+    assert type(content) is str
+    assert "" == content
+
     await MockClusterAPI.cleanup(pool_addr)
 
 
@@ -135,6 +146,16 @@ async def test_web_api(actor_pool):
     assert len(proc_info) > 0
     stacks = await web_api.get_node_thread_stacks(pool_addr)
     assert len(stacks) > 0
+
+    log_content = await web_api.fetch_node_log(size=None, address=pool_addr)
+    assert len(log_content) == 0
+
+    log_content = await web_api.fetch_node_log(size=5, address=pool_addr)
+    assert len(log_content) == 0
+
+    log_content = await web_api.fetch_node_log(size=-1, address=pool_addr)
+    assert type(log_content) is str
+    assert len(log_content) == 0
 
     await MockClusterAPI.cleanup(pool_addr)
 

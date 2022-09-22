@@ -16,7 +16,7 @@ RUN apt-get -yq update --allow-releaseinfo-change \
 RUN mkdir -p /srv
 WORKDIR /srv
 
-RUN cp /opt/mars/mars/deploy/kubernetes/docker/docker-logging.conf /srv/logging.conf \
+RUN cp /opt/mars/mars/deploy/oscar/file-logging.conf /srv/logging.conf \
   && cp /opt/mars/mars/deploy/kubernetes/docker/entrypoint.sh /srv/entrypoint.sh \
   && chmod a+x /srv/*.sh
 
