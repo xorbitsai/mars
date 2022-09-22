@@ -17,7 +17,7 @@ import logging
 import sys
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Type, Tuple
+from typing import Any, Dict, List, Optional, Set, Type
 
 from .... import oscar as mo
 from ....core import ChunkGraph, OperandType, enter_mode, ExecutionError
@@ -27,7 +27,6 @@ from ....core.operand import (
     FetchShuffle,
     execute,
 )
-from ....lib.aio import alru_cache
 from ....metrics import Metrics
 from ....optimization.physical import optimize
 from ....serialization import AioSerializer
@@ -384,15 +383,19 @@ class SubtaskProcessor:
         buffer_list = await asyncio.gather(*serialization_tasks)
         sizes = [sum(len(b) for b in buf) for buf in buffer_list]
         writer = await self._storage_api.open_writer(data_keys, sizes, multi=True)
-        writer.set_main_key((data_keys[0], 'shuffle'))
+        main_key = data_keys[0][0]
+        writer.set_main_key(main_key)
         for buffers, data_key in zip(buffer_list, data_keys):
             for buf in buffers:
                 await writer.write(buf)
         await writer.close()
-        main_key = data_keys[0][0]
         data_key_to_memory_size[main_key] = memory_size
-        data_key_to_store_size[main_key] = sum(sizes)
+        data_key_to_store_size[main_key] = memory_size
         data_key_to_object_id[main_key] = writer._object_id
+        for key, size in zip(data_keys, sizes):
+            data_key_to_memory_size[key] = size
+            data_key_to_store_size[key] = size
+            data_key_to_object_id[key] = writer._object_id
 
     async def _store_meta(
         self,

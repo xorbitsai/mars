@@ -20,7 +20,7 @@ from typing import Dict, List, Union, Tuple, Set
 from ... import oscar as mo
 from ...lib.aio import alru_cache
 from ...storage import StorageLevel
-from ...utils import dataslots, FixedSizeFileObject
+from ...utils import dataslots
 from .core import DataManagerActor, WrappedStorageFileObject
 from .handler import StorageHandlerActor
 
@@ -407,10 +407,13 @@ class ReceiverManagerActor(mo.StatelessActor):
                 raise
 
     async def do_write(
-        self, data_list: list, session_id: str, data_keys: List[str], eof_marks: List[bool]
+        self,
+        data_list: list,
+        session_id: str,
+        data_keys: List[str],
+        eof_marks: List[bool],
     ):
         # close may be a high-cost operation, use create_task
-        close_tasks = []
         finished_keys = []
         for data, data_key, is_eof in zip(data_list, data_keys, eof_marks):
             if isinstance(data_key, tuple):

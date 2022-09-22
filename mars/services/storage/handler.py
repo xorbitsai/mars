@@ -274,23 +274,18 @@ class StorageHandlerActor(mo.Actor):
         if error not in ("raise", "ignore"):  # pragma: no cover
             raise ValueError("error must be raise or ignore")
 
-        data_key = await self._data_manager_ref.get_store_key(session_id, data_key)
         all_infos = await self._data_manager_ref.get_data_infos(
             session_id, data_key, self._band_name, error
         )
         if not all_infos:
             return
 
-        key_to_infos = (
-            all_infos if isinstance(all_infos, dict) else {data_key: all_infos}
-        )
-
-        for key, infos in key_to_infos.items():
-            for info in infos:
-                level = info.level
-                await self._data_manager_ref.delete_data_info(
-                    session_id, key, level, self._band_name
-                )
+        for info in all_infos:
+            level = info.level
+            ret = await self._data_manager_ref.delete_data_info(
+                session_id, data_key, level, self._band_name
+            )
+            if ret is not None:
                 await self._clients[level].delete(info.object_id)
                 await self._quota_refs[level].release_quota(info.store_size)
 
@@ -301,12 +296,7 @@ class StorageHandlerActor(mo.Actor):
         data_keys = []
         for args, kwargs in zip(args_list, kwargs_list):
             session_id, data_key, error = self.delete.bind(*args, **kwargs)
-            data_keys.append(
-                self._data_manager_ref.delete_part_data.delay(session_id, data_key)
-            )
-        data_keys = await self._data_manager_ref.delete_part_data.batch(*data_keys)
-        data_keys = [key for key in data_keys if key is not None]
-
+            data_keys.append(data_key)
         infos_list = await self._data_manager_ref.get_data_infos.batch(
             *[
                 self._data_manager_ref.get_data_infos.delay(
@@ -323,29 +313,26 @@ class StorageHandlerActor(mo.Actor):
             if not all_infos:
                 # data not exist and error == 'ignore'
                 continue
-            key_to_infos = (
-                all_infos if isinstance(all_infos, dict) else {data_key: all_infos}
-            )
-
-            for key, infos in key_to_infos.items():
-                for info in infos:
-                    level = info.level
-                    delete_infos.append(
-                        self._data_manager_ref.delete_data_info.delay(
-                            session_id, key, level, info.band
-                        )
+            for info in all_infos:
+                level = info.level
+                delete_infos.append(
+                    self._data_manager_ref.delete_data_info.delay(
+                        session_id, data_key, level, info.band
                     )
-                    to_removes.append((level, info.object_id))
-                    level_sizes[level] += info.store_size
+                )
+                to_removes.append((level, info.object_id))
+                level_sizes[level] += info.store_size
 
         if not delete_infos:
             # no data to remove
             return
 
-        await self._data_manager_ref.delete_data_info.batch(*delete_infos)
-        await asyncio.gather(
-            *[self._clients[level].delete(object_id) for level, object_id in to_removes]
-        )
+        rets = await self._data_manager_ref.delete_data_info.batch(*delete_infos)
+        delete_tasks = []
+        for (level, object_id), ret in zip(to_removes, rets):
+            if ret:
+                delete_tasks.append(self._clients[level].delete(object_id))
+        await asyncio.gather(*delete_tasks)
         for level, size in level_sizes.items():
             await self._quota_refs[level].release_quota(size)
 
