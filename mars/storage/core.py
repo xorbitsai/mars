@@ -64,6 +64,9 @@ class BufferWrappedFileObject(ABC):
         self._mv = None
         self._buffer = None
 
+        if "w" in mode:
+            self._write_init()
+
     @abstractmethod
     def _read_init(self):
         """
@@ -103,7 +106,6 @@ class BufferWrappedFileObject(ABC):
     def write(self, content: Union[bytes, memoryview]):
         if not self._initialized:
             self._write_init()
-            self._initialized = True
 
         offset = self._offset
         content_length = getattr(content, "nbytes", len(content))
@@ -124,7 +126,10 @@ class BufferWrappedFileObject(ABC):
             assert whence == os.SEEK_SET
             new_offset = offset
         if new_offset < 0 or new_offset >= self._size:
-            raise ValueError(f"File offset should be limited to (0, {self._size})")
+            raise ValueError(
+                f"File offset should be limited to (0, {self._size}), "
+                f"now is {new_offset}"
+            )
         self._offset = new_offset
         return self._offset
 

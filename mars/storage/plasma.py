@@ -57,6 +57,7 @@ class PlasmaFileObject(BufferWrappedFileObject):
         self._buffer = buf = self._plasma_client.create(self._object_id, self._size)
         file = self._file = pa.FixedSizeBufferWriter(buf)
         file.set_memcopy_threads(6)
+        self._initialized = True
 
     def _read_init(self):
         self._buffer = buf = self._plasma_client.get_buffers([self._object_id])[0]

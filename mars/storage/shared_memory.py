@@ -73,6 +73,7 @@ class SharedMemoryFileObject(BufferWrappedFileObject):
         )
         self._write_actual_size()
         self._buffer = self._mv = shm.buf
+        self._initialized = True
 
     def _read_init(self):
         self.shm = shm = SharedMemoryForRead(name=self._object_id)

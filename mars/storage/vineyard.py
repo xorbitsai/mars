@@ -84,6 +84,7 @@ class VineyardFileObject(BufferWrappedFileObject):
 
     def _write_init(self):
         self._writer = vy_data_pickle.PickledWriter(self._size)
+        self._initialized = True
 
     @property
     def buffer(self):

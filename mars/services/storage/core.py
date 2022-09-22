@@ -31,6 +31,32 @@ from .errors import DataNotExist, StorageFull
 logger = logging.getLogger(__name__)
 
 
+@dataslots
+@dataclass
+class DataInfo:
+    object_id: object
+    level: StorageLevel
+    memory_size: int
+    store_size: int
+    band: str = None
+    offset: int = None
+
+
+@dataslots
+@dataclass
+class InternalDataInfo:
+    data_info: DataInfo
+    object_info: ObjectInfo
+
+
+@dataslots
+@dataclass
+class MultiDataMeta:
+    main_key: str
+    offset: int
+    size: int
+
+
 def build_data_info(storage_info: ObjectInfo, level, size, band_name=None):
     # todo handle multiple
     if band_name is None:
@@ -53,9 +79,10 @@ class WrappedStorageFileObject(AioFileObject):
         self,
         file: StorageFileObject,
         level: StorageLevel,
-        size: int,
+        size: Union[int, List],
         session_id: str,
-        data_key: str,
+        band: str,
+        data_key: Union[str, List],
         data_manager: mo.ActorRefType["DataManagerActor"],
         storage_handler: StorageBackend,
     ):
@@ -64,6 +91,7 @@ class WrappedStorageFileObject(AioFileObject):
         self._size = size
         self._level = level
         self._session_id = session_id
+        self._band = band
         self._data_key = data_key
         self._data_manager = data_manager
         self._storage_handler = storage_handler
@@ -74,6 +102,14 @@ class WrappedStorageFileObject(AioFileObject):
     async def clean_up(self):
         self._file.close()
 
+    async def put_data_info(self):
+        object_info = await self._storage_handler.object_info(self._object_id)
+        object_info.size = self._size
+        data_info = build_data_info(object_info, self._level, self._size)
+        await self._data_manager.put_data_info(
+            self._session_id, self._data_key, data_info, object_info
+        )
+
     async def close(self):
         self._file.close()
         if self._object_id is None:
@@ -81,11 +117,36 @@ class WrappedStorageFileObject(AioFileObject):
             # object id is generated after write close
             self._object_id = self._file.object_id
         if "w" in self._file.mode:
-            object_info = await self._storage_handler.object_info(self._object_id)
-            data_info = build_data_info(object_info, self._level, self._size)
-            await self._data_manager.put_data_info(
-                self._session_id, self._data_key, data_info, object_info
-            )
+            await self.put_data_info()
+
+
+class WrappedStorageFileObjectMulti(WrappedStorageFileObject):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert isinstance(self._size, (tuple, list))
+        assert isinstance(self._data_key, (tuple, list))
+        sizes = self._size
+        self._size = sum(sizes)
+        # meta to record data's offset and length,
+        # {'data_key': (offset, size)}. Data order in file must
+        # follow the order of keys in self._key
+        self._meta = dict()
+        self._main_key = None
+        offset = 0
+        for data_key, data_size in zip(self._data_key, sizes):
+            self._meta[data_key] = (offset, data_size)
+            offset += data_size
+
+    def set_main_key(self, main_key: Union[str, Tuple]):
+        self._main_key = main_key
+
+    async def put_data_info(self):
+        object_id = self._file.object_id
+        object_info = ObjectInfo(object_id=object_id, size=self._size)
+        data_info = build_data_info(object_info, self._level, self._size)
+        await self._data_manager.put_data_info(
+            self._session_id, self._main_key, data_info, object_info, self._meta
+        )
 
 
 class StorageQuotaActor(mo.Actor):
@@ -152,23 +213,6 @@ class StorageQuotaActor(mo.Actor):
         return self._total_size, self._used_size
 
 
-@dataslots
-@dataclass
-class DataInfo:
-    object_id: object
-    level: StorageLevel
-    memory_size: int
-    store_size: int
-    band: str = None
-
-
-@dataslots
-@dataclass
-class InternalDataInfo:
-    data_info: DataInfo
-    object_info: ObjectInfo
-
-
 class DataManagerActor(mo.Actor):
     _data_key_to_info: Dict[tuple, List[InternalDataInfo]]
 
@@ -184,6 +228,10 @@ class DataManagerActor(mo.Actor):
         # data key may be a tuple in shuffle cases,
         # we record the mapping from main key to sub keys
         self._main_key_to_sub_keys = defaultdict(set)
+        # we may store multiple small data into one file,
+        # it records offset and size.
+        self._data_key_to_store_key = dict()
+        self._key_to_meta = dict()
         for level in StorageLevel.__members__.values():
             for band_name in bands:
                 self._data_info_list[level, band_name] = dict()
@@ -225,17 +273,6 @@ class DataManagerActor(mo.Actor):
         else:
             return self._get_data_infos(session_id, data_key, band_name, error)
 
-    def _get_data_info(
-        self, session_id: str, data_key: str, band_name: str, error: str = "raise"
-    ) -> Union[DataInfo, None]:
-        # if the data is stored in multiply levels,
-        # return the lowest level info
-        infos = self._get_data_infos(session_id, data_key, band_name, error)
-        if not infos:
-            return
-        infos = sorted(infos, key=lambda x: x.level)
-        return infos[0]
-
     @mo.extensible
     def get_data_info(
         self,
@@ -244,14 +281,37 @@ class DataManagerActor(mo.Actor):
         band_name: str = None,
         error: str = "raise",
     ) -> Union[DataInfo, None]:
-        return self._get_data_info(session_id, data_key, band_name, error)
+        def _get_lowest_info(data_key: Union[str, Tuple]):
+            # if the data is stored in multiply levels,
+            # return the lowest level info
+            infos = self._get_data_infos(session_id, data_key, band_name, error)
+            if not infos:
+                return
+            info = sorted(infos, key=lambda x: x.level)[0]
+            return info
 
-    def _put_data_info(
+        if (session_id, data_key) in self._data_key_to_store_key:
+            store_info = self._data_key_to_store_key[(session_id, data_key)]
+            main_key_info = _get_lowest_info(store_info.main_key)
+            return DataInfo(
+                main_key_info.object_id,
+                main_key_info.level,
+                store_info.size,
+                store_info.size,
+                main_key_info.band,
+                store_info.offset,
+            )
+        else:
+            return _get_lowest_info(data_key)
+
+    @mo.extensible
+    def put_data_info(
         self,
         session_id: str,
-        data_key: str,
+        data_key: Union[str, tuple],
         data_info: DataInfo,
         object_info: ObjectInfo = None,
+        file_meta: Dict = None,
     ):
         info = InternalDataInfo(data_info, object_info)
         self._data_key_to_info[(session_id, data_key)].append(info)
@@ -261,20 +321,18 @@ class DataManagerActor(mo.Actor):
         self._spill_strategy[data_info.level, data_info.band].record_put_info(
             (session_id, data_key), data_info.store_size
         )
-        if isinstance(data_key, tuple):
-            self._main_key_to_sub_keys[(session_id, data_key[0])].update([data_key])
+        if file_meta:
+            for key, (offset, size) in file_meta.items():
+                self._data_key_to_store_key[(session_id, key)] = MultiDataMeta(
+                    data_key, offset, size
+                )
+            self._key_to_meta[(session_id, data_key)] = file_meta
+        else:
+            if isinstance(data_key, tuple):
+                self._main_key_to_sub_keys[(session_id, data_key[0])].update([data_key])
 
     @mo.extensible
-    def put_data_info(
-        self,
-        session_id: str,
-        data_key: str,
-        data_info: DataInfo,
-        object_info: ObjectInfo = None,
-    ):
-        self._put_data_info(session_id, data_key, data_info, object_info=object_info)
-
-    def _delete_data_info(
+    def delete_data_info(
         self, session_id: str, data_key: str, level: StorageLevel, band_name: str
     ):
         if (session_id, data_key) in self._data_key_to_info:
@@ -295,10 +353,29 @@ class DataManagerActor(mo.Actor):
                 self._data_key_to_info[(session_id, data_key)] = rest
 
     @mo.extensible
-    def delete_data_info(
-        self, session_id: str, data_key: str, level: StorageLevel, band_name: str
-    ):
-        self._delete_data_info(session_id, data_key, level, band_name)
+    def get_store_key(self, session_id: str, data_key: str):
+        if (session_id, data_key) in self._data_key_to_store_key:
+            return self._data_key_to_store_key[(session_id, data_key)].main_key
+        else:
+            return data_key
+
+    @mo.extensible
+    def delete_part_data(self, session_id: str, data_key: str):
+        if (session_id, data_key) in self._data_key_to_store_key:
+            file = self._data_key_to_store_key[(session_id, data_key)].main_key
+            meta = self._key_to_meta[(session_id, file)]
+            meta.pop(data_key)
+            if len(meta) == 0:
+                return file
+        else:
+            return data_key
+
+    @mo.extensible
+    def get_file_meta(self, session_id: str, store_key: str):
+        if (session_id, store_key) in self._key_to_meta:
+            return self._key_to_meta[(session_id, store_key)]
+        else:
+            return None
 
     def list(self, level: StorageLevel, ban_name: str):
         return list(self._data_info_list[level, ban_name].keys())

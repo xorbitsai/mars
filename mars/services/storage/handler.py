@@ -14,10 +14,13 @@
 
 import asyncio
 import logging
+import random
 from collections import defaultdict
+from string import digits, ascii_letters
 from typing import Any, Dict, List, Union
 
 from ... import oscar as mo
+from ...serialization import AioDeserializer
 from ...storage import StorageLevel, get_storage_backend
 from ...storage.core import StorageFileObject
 from ...typing import BandType
@@ -30,6 +33,7 @@ from .core import (
     DataInfo,
     build_data_info,
     WrappedStorageFileObject,
+    WrappedStorageFileObjectMulti,
 )
 from .errors import DataNotExist, NoDataToSpill
 
@@ -111,8 +115,16 @@ class StorageHandlerActor(mo.Actor):
             data_info = await self._data_manager_ref.get_data_info(
                 session_id, data_key, self._band_name
             )
-            data = yield self._get_data(data_info, conditions)
-            raise mo.Return(data)
+            if data_info is not None and data_info.offset is not None:
+                reader = await self._clients[data_info.level].open_reader(
+                    data_info.object_id
+                )
+                await reader.seek(data_info.offset)
+                data = await AioDeserializer(reader).run()
+                raise mo.Return(data)
+            else:
+                data = yield self._get_data(data_info, conditions)
+                raise mo.Return(data)
         except DataNotExist:
             if error == "raise":
                 raise
@@ -139,9 +151,26 @@ class StorageHandlerActor(mo.Actor):
             conditions_list.append(conditions)
         data_infos = await self._data_manager_ref.get_data_info.batch(*infos)
         results = []
+        reader_args = set(
+            [
+                (info.object_id, info.level)
+                for info in data_infos
+                if info is not None and info.offset is not None
+            ]
+        )
+        object_id_to_reader = dict()
+        for object_id, level in reader_args:
+            object_id_to_reader[object_id] = await self._clients[level].open_reader(
+                object_id
+            )
         for data_info, conditions in zip(data_infos, conditions_list):
             if data_info is None:
                 results.append(None)
+            elif data_info.offset is not None:
+                reader = object_id_to_reader[data_info.object_id]
+                await reader.seek(data_info.offset)
+                result = await AioDeserializer(reader).run()
+                results.append(result)
             else:
                 result = yield self._get_data(data_info, conditions)
                 results.append(result)
@@ -226,12 +255,6 @@ class StorageHandlerActor(mo.Actor):
         await self.notify_spillable_space(level)
         return data_infos
 
-    def _get_data_infos_arg(self, session_id: str, data_key: str, error: str = "raise"):
-        infos = self._data_manager_ref.get_data_infos.delay(
-            session_id, data_key, self._band_name, error
-        )
-        return infos, session_id, data_key
-
     async def delete_object(
         self,
         session_id: str,
@@ -251,6 +274,7 @@ class StorageHandlerActor(mo.Actor):
         if error not in ("raise", "ignore"):  # pragma: no cover
             raise ValueError("error must be raise or ignore")
 
+        data_key = await self._data_manager_ref.get_store_key(session_id, data_key)
         all_infos = await self._data_manager_ref.get_data_infos(
             session_id, data_key, self._band_name, error
         )
@@ -272,14 +296,25 @@ class StorageHandlerActor(mo.Actor):
 
     @delete.batch
     async def batch_delete(self, args_list, kwargs_list):
-        get_infos = []
         session_id = None
+        error = None
         data_keys = []
         for args, kwargs in zip(args_list, kwargs_list):
-            infos, session_id, data_key = self._get_data_infos_arg(*args, **kwargs)
-            get_infos.append(infos)
-            data_keys.append(data_key)
-        infos_list = await self._data_manager_ref.get_data_infos.batch(*get_infos)
+            session_id, data_key, error = self.delete.bind(*args, **kwargs)
+            data_keys.append(
+                self._data_manager_ref.delete_part_data.delay(session_id, data_key)
+            )
+        data_keys = await self._data_manager_ref.delete_part_data.batch(*data_keys)
+        data_keys = [key for key in data_keys if key is not None]
+
+        infos_list = await self._data_manager_ref.get_data_infos.batch(
+            *[
+                self._data_manager_ref.get_data_infos.delay(
+                    session_id, data_key, self._band_name, error
+                )
+                for data_key in data_keys
+            ]
+        )
 
         delete_infos = []
         to_removes = []
@@ -343,56 +378,96 @@ class StorageHandlerActor(mo.Actor):
     async def open_writer(
         self,
         session_id: str,
-        data_key: str,
-        size: int,
+        data_key: Union[str, List],
+        size: Union[int, List],
         level: StorageLevel,
-        request_quota=True,
+        multi: bool = False,
     ) -> WrappedStorageFileObject:
-        if request_quota:
+        if level is None:
+            level = self.highest_level
+        if multi:
+            assert isinstance(data_key, (tuple, list))
+            assert isinstance(size, (tuple, list))
+            total_size = sum(size)
+            await self.request_quota_with_spill(level, total_size)
+            writer = await self._clients[level].open_writer(total_size)
+            return WrappedStorageFileObjectMulti(
+                writer,
+                level,
+                size,
+                session_id,
+                self._band_name,
+                data_key,
+                self._data_manager_ref,
+                self._clients[level],
+            )
+        else:
             await self.request_quota_with_spill(level, size)
-        writer = await self._clients[level].open_writer(size)
-        return WrappedStorageFileObject(
-            writer,
-            level,
-            size,
-            session_id,
-            data_key,
-            self._data_manager_ref,
-            self._clients[level],
-        )
+            writer = await self._clients[level].open_writer(size)
+            return WrappedStorageFileObject(
+                writer,
+                level,
+                size,
+                session_id,
+                self._band_name,
+                data_key,
+                self._data_manager_ref,
+                self._clients[level],
+            )
 
     @open_writer.batch
     async def batch_open_writers(self, args_list, kwargs_list):
         extracted_args = None
         data_keys, sizes = [], []
         for args, kwargs in zip(args_list, kwargs_list):
-            session_id, data_key, size, level, request_quota = self.open_writer.bind(
-                *args, **kwargs
-            )
+            (
+                session_id,
+                data_key,
+                size,
+                level,
+                multi,
+            ) = self.open_writer.bind(*args, **kwargs)
             if extracted_args:
-                assert extracted_args == (session_id, level, request_quota)
-            extracted_args = (session_id, level, request_quota)
+                assert extracted_args == (session_id, level, multi)
+            extracted_args = (session_id, level, multi)
             data_keys.append(data_key)
             sizes.append(size)
-        session_id, level, request_quota = extracted_args
-        if request_quota:  # pragma: no cover
-            await self.request_quota_with_spill(level, sum(sizes))
+        session_id, level, multi = extracted_args
+        if level is None:
+            level = self.highest_level
+        total_sizes = [sum(s) for s in sizes] if multi else sizes
+        await self.request_quota_with_spill(level, sum(total_sizes))
         writers = await asyncio.gather(
-            *[self._clients[level].open_writer(size) for size in sizes]
+            *[self._clients[level].open_writer(size) for size in total_sizes]
         )
         wrapped_writers = []
         for writer, size, data_key in zip(writers, sizes, data_keys):
-            wrapped_writers.append(
-                WrappedStorageFileObject(
-                    writer,
-                    level,
-                    size,
-                    session_id,
-                    data_key,
-                    self._data_manager_ref,
-                    self._clients[level],
+            if multi:
+                wrapped_writers.append(
+                    WrappedStorageFileObjectMulti(
+                        writer,
+                        level,
+                        size,
+                        session_id,
+                        self._band_name,
+                        data_key,
+                        self._data_manager_ref,
+                        self._clients[level],
+                    )
                 )
-            )
+            else:
+                wrapped_writers.append(
+                    WrappedStorageFileObject(
+                        writer,
+                        level,
+                        size,
+                        session_id,
+                        self._band_name,
+                        data_key,
+                        self._data_manager_ref,
+                        self._clients[level],
+                    )
+                )
         return wrapped_writers
 
     async def _get_meta_api(self, session_id: str):
@@ -527,6 +602,24 @@ class StorageHandlerActor(mo.Actor):
         else:  # pragma: no cover
             metas = [{"bands": [(address, band_name)]}] * len(missing_keys)
         assert len(metas) == len(missing_keys)
+        # for shuffle keys, we create one writer in advance.
+        if StorageLevel.REMOTE not in self._quota_refs:
+            from .transfer import ReceiverManagerActor
+
+            mapper_keys = []
+            for key in missing_keys:
+                if isinstance(key, tuple):
+                    mapper_keys.append(key)
+            if mapper_keys:
+                main_key = (
+                    "".join(random.choice(ascii_letters + digits) for _ in range(30)),
+                    "shuffle",
+                )
+                receiver_ref = await mo.actor_ref(
+                    address=self.address, uid=ReceiverManagerActor.gen_uid(band_name)
+                )
+                await receiver_ref.register_shuffle_task(main_key, mapper_keys)
+
         for data_key, bands in zip(missing_keys, metas):
             if bands is not None:
                 remote_keys[bands["bands"][0]].add(data_key)

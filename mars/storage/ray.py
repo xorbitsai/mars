@@ -81,6 +81,7 @@ class RayFileObject(BufferWrappedFileObject):
 
     def _write_init(self):
         self._buffer = RayFileLikeObject()
+        self._initialized = True
 
     def _read_init(self):
         self._buffer = ray.get(self._object_id)

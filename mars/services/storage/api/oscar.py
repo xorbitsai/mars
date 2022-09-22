@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import sys
-from typing import Any, List, Type, TypeVar
+from typing import Any, List, Tuple, Type, TypeVar, Union
 
 from .... import oscar as mo
 from ....lib.aio import alru_cache
@@ -163,7 +163,7 @@ class StorageAPI(AbstractStorageAPI):
     @mo.extensible
     async def fetch(
         self,
-        data_key: str,
+        data_key: Union[str, Tuple],
         level: StorageLevel = None,
         band_name: str = None,
         remote_address: str = None,
@@ -247,26 +247,31 @@ class StorageAPI(AbstractStorageAPI):
         return await self._storage_handler_ref.open_reader(self._session_id, data_key)
 
     async def open_writer(
-        self, data_key: str, size: int, level: StorageLevel
+        self,
+        data_key: Union[Tuple, str],
+        size: Union[List, int],
+        level: StorageLevel = None,
+        multi: bool = False,
     ) -> WrappedStorageFileObject:
         """
         Return a file-like object for writing data.
 
         Parameters
         ----------
-        data_key: str
-            data key
-        size: int
-            the total size of data
+        data_key: str or list
+            data key, a list when open writer for multiple data
+        size: int or list
+            the total size of data, a list when open writer for multiple data
         level: StorageLevel
             the storage level to write
-
+        multi: bool, False as default
+            if store multiple data
         Returns
         -------
             return a file-like object.
         """
         return await self._storage_handler_ref.open_writer(
-            self._session_id, data_key, size, level
+            self._session_id, data_key, size, level, multi
         )
 
     async def list(self, level: StorageLevel) -> List:

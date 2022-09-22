@@ -17,7 +17,7 @@ import logging
 import sys
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any, Dict, List, Optional, Set, Type, Tuple
 
 from .... import oscar as mo
 from ....core import ChunkGraph, OperandType, enter_mode, ExecutionError
@@ -27,10 +27,12 @@ from ....core.operand import (
     FetchShuffle,
     execute,
 )
+from ....lib.aio import alru_cache
 from ....metrics import Metrics
 from ....optimization.physical import optimize
+from ....serialization import AioSerializer
 from ....typing import BandType, ChunkType
-from ....utils import get_chunk_key_to_data_keys
+from ....utils import get_chunk_key_to_data_keys, calc_data_size
 from ...context import ThreadedServiceContext
 from ...meta.api import MetaAPI, WorkerMetaAPI
 from ...session import SessionAPI
@@ -294,9 +296,14 @@ class SubtaskProcessor:
     async def _store_data(self, chunk_graph: ChunkGraph):
         # store data into storage
         data_key_to_puts = {}
+        shuffle_key_to_data = {}
         for key, data, _ in iter_output_data(chunk_graph, self._processor_context):
-            put = self._storage_api.put.delay(key, data)
-            data_key_to_puts[key] = put
+            # for shuffle data, put them into one file to reduce file numbers
+            if isinstance(key, tuple):
+                shuffle_key_to_data[key] = data
+            else:
+                put = self._storage_api.put.delay(key, data)
+                data_key_to_puts[key] = put
 
         stored_keys = list(data_key_to_puts.keys())
         puts = data_key_to_puts.values()
@@ -337,6 +344,13 @@ class SubtaskProcessor:
                 self.result.status = SubtaskStatus.cancelled
                 raise
 
+        if shuffle_key_to_data:
+            await self._store_mapper_data(
+                shuffle_key_to_data,
+                data_key_to_store_size,
+                data_key_to_memory_size,
+                data_key_to_object_id,
+            )
         # clear data
         self._processor_context = ProcessorContext()
         return (
@@ -345,6 +359,40 @@ class SubtaskProcessor:
             data_key_to_memory_size,
             data_key_to_object_id,
         )
+
+    async def _store_mapper_data(
+        self,
+        shuffle_key_to_data: Dict,
+        data_key_to_store_size: Dict,
+        data_key_to_memory_size: Dict,
+        data_key_to_object_id: Dict,
+    ):
+        data_keys = tuple(shuffle_key_to_data.keys())
+        # use main key and shuffle to name this merged file
+        serialization_tasks = [
+            asyncio.create_task(AioSerializer(obj).run())
+            for obj in shuffle_key_to_data.values()
+        ]
+        memory_size = sum(
+            await asyncio.gather(
+                *[
+                    asyncio.to_thread(calc_data_size, obj)
+                    for obj in shuffle_key_to_data.values()
+                ]
+            )
+        )
+        buffer_list = await asyncio.gather(*serialization_tasks)
+        sizes = [sum(len(b) for b in buf) for buf in buffer_list]
+        writer = await self._storage_api.open_writer(data_keys, sizes, multi=True)
+        writer.set_main_key((data_keys[0], 'shuffle'))
+        for buffers, data_key in zip(buffer_list, data_keys):
+            for buf in buffers:
+                await writer.write(buf)
+        await writer.close()
+        main_key = data_keys[0][0]
+        data_key_to_memory_size[main_key] = memory_size
+        data_key_to_store_size[main_key] = sum(sizes)
+        data_key_to_object_id[main_key] = writer._object_id
 
     async def _store_meta(
         self,

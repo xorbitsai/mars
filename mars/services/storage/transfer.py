@@ -15,12 +15,12 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Union, Tuple, Set
 
 from ... import oscar as mo
 from ...lib.aio import alru_cache
 from ...storage import StorageLevel
-from ...utils import dataslots
+from ...utils import dataslots, FixedSizeFileObject
 from .core import DataManagerActor, WrappedStorageFileObject
 from .handler import StorageHandlerActor
 
@@ -65,7 +65,7 @@ class SenderManagerActor(mo.StatelessActor):
         receiver_ref: mo.ActorRefType["ReceiverManagerActor"],
         session_id: str,
         data_keys: List[str],
-        level: StorageLevel,
+        infos: List,
         block_size: int,
     ):
         class BufferedSender:
@@ -99,7 +99,30 @@ class SenderManagerActor(mo.StatelessActor):
             )
         readers = await self._storage_handler.open_reader.batch(*open_reader_tasks)
 
-        for data_key, reader in zip(data_keys, readers):
+        class AsyncFixedReader:
+            def __init__(self, file_obj, fixed_size: int):
+                self._file_obj = file_obj
+                self._cur = 0
+                self._size = fixed_size
+                self._end = self._cur + self._size
+
+            def _get_size(self, size):
+                max_size = self._end - self._cur
+                if size is None:
+                    return max_size
+                else:
+                    return min(max_size, size)
+
+            async def read(self, size=None):
+                read_size = self._get_size(size)
+                result = await self._file_obj.read(read_size)
+                self._cur += read_size
+                return result
+
+        for data_key, reader, info in zip(data_keys, readers, infos):
+            if info.offset:
+                await reader.seek(info.offset)
+                reader = AsyncFixedReader(reader, info.store_size)
             while True:
                 part_data = await reader.read(block_size)
                 # Notes on [How to decide whether the reader reaches EOF?]
@@ -115,6 +138,19 @@ class SenderManagerActor(mo.StatelessActor):
                 if is_eof:
                     break
         await sender.flush()
+
+    async def _send_mapper_data(
+        self,
+        receiver_ref: mo.ActorRefType["ReceiverManagerActor"],
+        session_id: str,
+        shuffle_main_keys: List,
+        data_keys: List[Union[str, Tuple]],
+        infos: List,
+        block_size: int,
+    ):
+        for main_key in shuffle_main_keys:
+            await receiver_ref.wait_writer_created(main_key)
+        await self._send_data(receiver_ref, session_id, data_keys, infos, block_size)
 
     @mo.extensible
     async def send_batch_data(
@@ -149,11 +185,13 @@ class SenderManagerActor(mo.StatelessActor):
             )
         await self._data_manager_ref.pin.batch(*pin_tasks)
         infos = await self._data_manager_ref.get_data_info.batch(*get_infos)
-        filtered = [
-            (data_info, data_key)
-            for data_info, data_key in zip(infos, data_keys)
-            if data_info is not None
-        ]
+        filtered = []
+        shuffle_keys = []
+        for data_info, data_key in zip(infos, data_keys):
+            if data_info is not None:
+                filtered.append((data_info, data_key))
+                if isinstance(data_key, tuple):
+                    shuffle_keys.append(data_key)
         if filtered:
             infos, data_keys = zip(*filtered)
         else:  # pragma: no cover
@@ -162,7 +200,7 @@ class SenderManagerActor(mo.StatelessActor):
         data_sizes = [info.store_size for info in infos]
         if level is None:
             level = infos[0].level
-        is_transferring_list = await receiver_ref.open_writers(
+        is_transferring_list, shuffle_main_keys = await receiver_ref.open_writers(
             session_id, data_keys, data_sizes, level
         )
         to_send_keys = []
@@ -173,12 +211,27 @@ class SenderManagerActor(mo.StatelessActor):
             else:
                 to_send_keys.append(data_key)
 
+        send_tasks = []
         if to_send_keys:
-            await self._send_data(
-                receiver_ref, session_id, to_send_keys, level, block_size
+            send_tasks.append(
+                self._send_data(
+                    receiver_ref, session_id, to_send_keys, infos, block_size
+                )
             )
         if to_wait_keys:
-            await receiver_ref.wait_transfer_done(session_id, to_wait_keys)
+            send_tasks.append(receiver_ref.wait_transfer_done(session_id, to_wait_keys))
+        if shuffle_keys and shuffle_main_keys:
+            send_tasks.append(
+                self._send_mapper_data(
+                    receiver_ref,
+                    session_id,
+                    list(shuffle_main_keys),
+                    shuffle_keys,
+                    infos,
+                    block_size,
+                )
+            )
+        await asyncio.gather(*send_tasks)
         unpin_tasks = []
         for data_key in data_keys:
             unpin_tasks.append(
@@ -206,6 +259,40 @@ class WritingInfo:
     ref_counts: int
 
 
+@dataslots
+@dataclass
+class ShuffleWritingInfo(WritingInfo):
+    lock: asyncio.Lock
+    offsets: Dict
+    finished_keys: Set
+
+
+class MapperRecorder:
+    def __init__(self, expected_mappers: Set):
+        self._expected_mappers = expected_mappers
+        self._mapper_info = dict()
+        self._total_size = 0
+
+    def append(self, data_key: Union[str, Tuple], data_size: int) -> bool:
+        # append data_key, if all keys are ready, return True
+        self._mapper_info[data_key] = (self._total_size, data_size)
+        self._total_size += data_size
+        if set(self._mapper_info) == self._expected_mappers:
+            return True
+        return False
+
+    @property
+    def mapper_info(self):
+        return self._mapper_info
+
+
+@dataslots
+@dataclass
+class ShuffleInfo:
+    mapper_recorder: MapperRecorder
+    event: asyncio.Event
+
+
 class ReceiverManagerActor(mo.StatelessActor):
     def __init__(
         self,
@@ -214,7 +301,10 @@ class ReceiverManagerActor(mo.StatelessActor):
     ):
         self._quota_refs = quota_refs
         self._storage_handler = storage_handler_ref
-        self._writing_infos: Dict[tuple, WritingInfo] = dict()
+        self._writing_infos: Dict[Union[str, Tuple], WritingInfo] = dict()
+        self._sub_to_main_key: Dict[Tuple, str] = dict()
+        self._shuffle_infos: Dict[str, ShuffleInfo] = dict()
+        self._shuffle_writing_status = dict()
         self._lock = asyncio.Lock()
 
     async def __post_create__(self):
@@ -235,20 +325,57 @@ class ReceiverManagerActor(mo.StatelessActor):
     async def create_writers(
         self,
         session_id: str,
-        data_keys: List[str],
+        data_keys: List[Union[str, Tuple]],
         data_sizes: List[int],
         level: StorageLevel,
     ):
         tasks = dict()
         data_key_to_size = dict()
         being_processed = []
+        shuffle_main_keys = set()
         for data_key, data_size in zip(data_keys, data_sizes):
             data_key_to_size[data_key] = data_size
             if (session_id, data_key) not in self._writing_infos:
-                being_processed.append(False)
-                tasks[data_key] = self._storage_handler.open_writer.delay(
-                    session_id, data_key, data_size, level, request_quota=False
-                )
+                if isinstance(data_key, tuple):
+                    # won't open writer for shuffle data instantly.
+                    main_key = self._sub_to_main_key[data_key]
+                    shuffle_main_keys.add(main_key)
+                    is_last = self._shuffle_infos[main_key].mapper_recorder.append(
+                        data_key, data_size
+                    )
+                    if is_last:
+                        # last mapper arrives, open the writer
+                        recorder = self._shuffle_infos[main_key].mapper_recorder
+                        data_keys = list(recorder.mapper_info.keys())
+                        sizes = [info[1] for info in recorder.mapper_info.values()]
+                        writer = await self._storage_handler.open_writer(
+                            session_id, data_keys, sizes, level, True
+                        )
+                        writer.set_main_key(main_key)
+                        self._shuffle_infos[main_key].event.set()
+                        offsets = dict(
+                            (key, offset)
+                            for key, (offset, _) in self._shuffle_infos[
+                                main_key
+                            ].mapper_recorder.mapper_info.items()
+                        )
+                        self._writing_infos[
+                            (session_id, main_key)
+                        ] = ShuffleWritingInfo(
+                            writer,
+                            data_size,
+                            level,
+                            asyncio.Event(),
+                            1,
+                            asyncio.Lock(),
+                            offsets,
+                            set(),
+                        )
+                else:
+                    being_processed.append(False)
+                    tasks[data_key] = self._storage_handler.open_writer.delay(
+                        session_id, data_key, data_size, level
+                    )
             else:
                 being_processed.append(True)
                 self._writing_infos[(session_id, data_key)].ref_counts += 1
@@ -260,7 +387,7 @@ class ReceiverManagerActor(mo.StatelessActor):
                 self._writing_infos[(session_id, data_key)] = WritingInfo(
                     writer, data_key_to_size[data_key], level, asyncio.Event(), 1
                 )
-        return being_processed
+        return being_processed, shuffle_main_keys
 
     async def open_writers(
         self,
@@ -270,31 +397,48 @@ class ReceiverManagerActor(mo.StatelessActor):
         level: StorageLevel,
     ):
         async with self._lock:
-            await self._storage_handler.request_quota_with_spill(level, sum(data_sizes))
             future = asyncio.create_task(
                 self.create_writers(session_id, data_keys, data_sizes, level)
             )
             try:
                 return await future
             except asyncio.CancelledError:
-                await self._quota_refs[level].release_quota(sum(data_sizes))
                 future.cancel()
                 raise
 
     async def do_write(
-        self, data: list, session_id: str, data_keys: List[str], eof_marks: List[bool]
+        self, data_list: list, session_id: str, data_keys: List[str], eof_marks: List[bool]
     ):
         # close may be a high-cost operation, use create_task
         close_tasks = []
         finished_keys = []
-        for data, data_key, is_eof in zip(data, data_keys, eof_marks):
-            writer = self._writing_infos[(session_id, data_key)].writer
-            if data:
-                await writer.write(data)
-            if is_eof:
-                close_tasks.append(writer.close())
-                finished_keys.append(data_key)
-        await asyncio.gather(*close_tasks)
+        for data, data_key, is_eof in zip(data_list, data_keys, eof_marks):
+            if isinstance(data_key, tuple):
+                # shuffle data
+                main_key = self._sub_to_main_key[data_key]
+                writer_info = self._writing_infos[(session_id, main_key)]
+                writer = writer_info.writer
+                if data:
+                    async with writer_info.lock:
+                        offset = writer_info.offsets[data_key]
+                        await writer.seek(offset)
+                        await writer.write(data)
+                        writer_info.offsets[data_key] += offset
+
+                if is_eof:
+                    writer_info.finished_keys.add(data_key)
+                    if writer_info.finished_keys == set(writer_info.offsets):
+                        await writer.close()
+                        finished_keys.append(main_key)
+
+            else:
+                writer_info = self._writing_infos[(session_id, data_key)]
+                writer = writer_info.writer
+                if data:
+                    await writer.write(data)
+                if is_eof:
+                    await writer.close()
+                    finished_keys.append(data_key)
         async with self._lock:
             for data_key in finished_keys:
                 event = self._writing_infos[(session_id, data_key)].event
@@ -333,3 +477,13 @@ class ReceiverManagerActor(mo.StatelessActor):
         async with self._lock:
             for data_key in data_keys:
                 self._decref_writing_key(session_id, data_key)
+
+    def register_shuffle_task(self, main_key: str, mapper_keys: List):
+        self._shuffle_infos[main_key] = ShuffleInfo(
+            mapper_recorder=MapperRecorder(set(mapper_keys)), event=asyncio.Event()
+        )
+        for mapper_key in mapper_keys:
+            self._sub_to_main_key[mapper_key] = main_key
+
+    async def wait_writer_created(self, main_key: str):
+        await self._shuffle_infos[main_key].event.wait()
