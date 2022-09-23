@@ -37,9 +37,9 @@ class InputColumnSelector:
         ret = {}
         for inp in tileable_data.op.inputs:
             if isinstance(inp, DataFrameData):
-                ret[inp] = required_cols.intersection(set(inp.dtypes.index))
+                ret[inp] = set(inp.dtypes.index)
             else:
-                ret[inp] = required_cols.intersection({inp.name})
+                ret[inp] = {inp.name}
         return ret
 
     @staticmethod

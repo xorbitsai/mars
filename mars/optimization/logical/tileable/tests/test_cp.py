@@ -80,7 +80,6 @@ def test_merge(setup, gen_data1):
 
     graph = c.build_graph()
     optimize(graph)
-    graph.view()
 
     # merge_node = graph.result_tileables[0]
     # assert type(merge_node.op) is DataFrameMerge

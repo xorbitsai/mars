@@ -304,6 +304,4 @@ class Optimizer(ABC):
                     records.get_optimization_result(result, default=result)
                 )
             graph.results = new_results
-        graph.view(f'mars_{uuid4()}')
-
         return records
