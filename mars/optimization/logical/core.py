@@ -175,9 +175,29 @@ class OptimizationRule(ABC):
             )
 
 
+class CommonGraphOptimizationRule(OptimizationRule):
+
+    effective: bool = False
+
+    def match(self, op: OperandType) -> bool:
+        return False
+
+    def apply(self, op: OperandType):
+        """
+        Apply rule to an operand.
+
+        Parameters
+        ----------
+        op : OperandType
+            Operand
+        """
+        pass
+
+
 class Optimizer(ABC):
     _rules: List[Type[OptimizationRule]]
     _op_to_rules: Dict[Type[OperandType], List[Type[OptimizationRule]]]
+    _common_rules: List[Type[OptimizationRule]]
 
     @classmethod
     def register_rule(
@@ -189,8 +209,11 @@ class Optimizer(ABC):
 
         if not hasattr(cls, "_op_to_rules"):
             cls._op_to_rules = defaultdict(list)
+            cls._common_rules = list()
         for operand_type in operand_types:
             cls._op_to_rules[operand_type].append(rule)
+            if operand_type is Operand and rule not in cls._common_rules:
+                cls._common_rules.append(rule)
 
     @classmethod
     def get_rule_types(
@@ -205,6 +228,9 @@ class Optimizer(ABC):
                 if rule_types is not None:
                     break
             cls._op_to_rules[operand_type] = rule_types or []
+        else:
+            rule_types.extend(cls._common_rules)
+
         return rule_types
 
     @classmethod
@@ -246,6 +272,12 @@ class Optimizer(ABC):
         )
 
         for rule_type in cls._rules:
+            if issubclass(rule_type, CommonGraphOptimizationRule):
+                rule = rule_type(graph, records, cls)
+                rule.apply(None)
+                optimized = rule.effective
+                continue
+
             visited = set()
             for entity in list(graph.topological_iter()):
                 op = entity.op
