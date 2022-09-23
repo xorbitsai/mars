@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Any
+from typing import Dict, Any, Set
 
-from mars.core import EntityData
+import pytest
+import mars.dataframe as md
+from mars.core import TileableData
+from mars.dataframe import DataFrame
 from ..input_column_selector import InputColumnSelector
 
 
@@ -22,7 +25,7 @@ class MockOperand:
     pass
 
 
-class MockEntityData(EntityData):
+class MockEntityData(TileableData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._op = MockOperand()
@@ -30,24 +33,142 @@ class MockEntityData(EntityData):
 
 def test_register():
     def _select_input_columns(
-        entity_data: EntityData, required_cols: List[Any]
-    ) -> Dict[EntityData, List[Any]]:
-        return {MockEntityData(): ["bar"]}
+        tileable_data: TileableData, required_cols: Set[Any]
+    ) -> Dict[TileableData, Set[Any]]:
+        return {}
 
-    InputColumnSelector.register("MockOperand", _select_input_columns)
-    print(InputColumnSelector.select_input_columns(MockEntityData(), ["a", "b", "c"]))
+    InputColumnSelector.register(MockOperand, _select_input_columns)
+    mock_data = MockEntityData()
+    assert InputColumnSelector.select_input_columns(mock_data, {"foo"}) == {}
+
+    # unregister
+    with pytest.raises(AttributeError):
+        InputColumnSelector.unregister(MockOperand)
+        InputColumnSelector.select_input_columns(mock_data, {"foo"})
 
 
-def test_col_pruning(setup):
+def test_col_pruning():
     import mars.dataframe as md
 
     left = md.DataFrame({"col1": (1, 2, 3), "col2": (4, 5, 6)})
-    right = md.DataFrame({"col1": (1, 3), "col3": (5, 8)})
-    joined = left.merge(right, left_on="col1", right_on="col1")
+    right = md.DataFrame({"col1": (1, 3), "col2": (4, 5), "col3": (5, 8)})
+    joined = left.merge(right, left_on="col1", right_on="col3")
+    input_columns = InputColumnSelector.select_input_columns(joined.data, {"col1"})
+    assert left.data in input_columns
+    assert input_columns[left.data] == {"col1"}
+    assert right.data in input_columns
+    assert input_columns[right.data] == {"col1", "col3"}
+
+
+def test_df_group_by_agg():
+    df: DataFrame = md.DataFrame(
+        {
+            "foo": (1, 1, 2, 2),
+            "bar": (3, 4, 3, 4),
+            "baz": (5, 6, 7, 8),
+            "qux": (9, 10, 11, 12),
+        }
+    )
+
+    s = df.groupby(by="foo")["baz"].sum()
+    input_columns = InputColumnSelector.select_input_columns(s.data, {"baz"})
+    assert len(input_columns) == 1
+    assert df.data in input_columns
+    assert input_columns[df.data] == {"foo", "baz"}
+
+    s = df.groupby(by=["foo", "bar"]).sum()
+    input_columns = InputColumnSelector.select_input_columns(s.data, {"baz"})
+    assert len(input_columns) == 1
+    assert df.data in input_columns
+    assert input_columns[df.data] == {"foo", "bar", "baz"}
+
+    s = df.groupby(by="foo").agg(["sum", "max"])
+    input_columns = InputColumnSelector.select_input_columns(s.data, {"baz"})
+    assert len(input_columns) == 1
+    assert df.data in input_columns
+    assert input_columns[df.data] == {"foo", "baz"}
+
+    s = df.groupby(by="foo")["bar", "baz"].agg(["sum", "max"])
+    input_columns = InputColumnSelector.select_input_columns(s.data, {"baz"})
+    assert len(input_columns) == 1
+    assert df.data in input_columns
+    assert input_columns[df.data] == {"foo", "bar", "baz"}
+
+    s = df.groupby(by="foo").agg(new_bar=("bar", "sum"), new_baz=("baz", "sum"))
+    input_columns = InputColumnSelector.select_input_columns(s.data, {"new_bar"})
+    assert len(input_columns) == 1
+    assert df.data in input_columns
+    assert input_columns[df.data] == {"foo", "bar", "baz"}
+
+
+def test_df_merge(setup):
+    left: DataFrame = md.DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6), 1: (7, 8, 9)})
+    right = md.DataFrame({"foo": (1, 2), "bar": (4, 5), "baz": (5, 8), 1: (7, 8)})
+
+    joined = left.merge(right, on=["foo"])
+
+    input_columns = InputColumnSelector.select_input_columns(joined.data, {"foo"})
+    assert left.data in input_columns
+    assert input_columns[left.data] == {"foo"}
+    assert right.data in input_columns
+    assert input_columns[right.data] == {"foo"}
+
     input_columns = InputColumnSelector.select_input_columns(
-        joined.data, ["col1", "col2"]
+        joined.data, {"foo", "baz"}
     )
     assert left.data in input_columns
-    assert input_columns[left.data] == ["col1", "col2"]
+    assert input_columns[left.data] == {"foo"}
     assert right.data in input_columns
-    assert input_columns[right.data] == ["col1"]
+    assert input_columns[right.data] == {"foo", "baz"}
+
+    input_columns = InputColumnSelector.select_input_columns(
+        joined.data, {"foo", "1_x"}
+    )
+    assert left.data in input_columns
+    assert input_columns[left.data] == {"foo", 1}
+    assert right.data in input_columns
+    assert input_columns[right.data] == {"foo"}
+
+    joined = left.merge(right, on=["foo", "bar"])
+    input_columns = InputColumnSelector.select_input_columns(joined.data, {"baz"})
+    assert left.data in input_columns
+    assert input_columns[left.data] == {"foo", "bar"}
+    assert right.data in input_columns
+    assert input_columns[right.data] == {"foo", "bar", "baz"}
+
+    joined = left.merge(right, on=["foo", "bar"])
+    input_columns = InputColumnSelector.select_input_columns(
+        joined.data, {"1_x", "1_y"}
+    )
+    assert left.data in input_columns
+    assert input_columns[left.data] == {"foo", "bar", 1}
+    assert right.data in input_columns
+    assert input_columns[right.data] == {"foo", "bar", 1}
+
+
+def test_arithmatic_ops(setup):
+    df: DataFrame = md.DataFrame(
+        {
+            "foo": (1, 1, 2, 2),
+            "bar": (3, 4, 3, 4),
+            "baz": (5, 6, 7, 8),
+            "qux": (9, 10, 11, 12),
+        }
+    )
+    df = df
+
+
+def test_select_all():
+    df: DataFrame = md.DataFrame(
+        {
+            "foo": (1, 1, 2, 2),
+            "bar": (3, 4, 3, 4),
+            "baz": (5, 6, 7, 8),
+            "qux": (9, 10, 11, 12),
+        }
+    )
+    head = df.head()
+    input_columns = InputColumnSelector.select_input_columns(head.data, {"foo"})
+    assert len(input_columns) == 1
+    assert head.data.inputs[0] in input_columns
+    assert input_columns[head.data.inputs[0]] == {"foo", "bar", "baz", "qux"}
