@@ -84,15 +84,15 @@ def test_merge(setup, gen_data1):
 
     # merge_node = graph.result_tileables[0]
     # assert type(merge_node.op) is DataFrameMerge
-
+    #
     # merge_node_preds = graph.predecessors(merge_node)
     # assert len(merge_node_preds) == 2
-
+    #
     # read_csv_node = merge_node_preds[0]
     # read_csv_op = read_csv_node.op
     # assert type(read_csv_op) is DataFrameReadCSV
     # assert len(read_csv_op.usecols) == 1
-
+    #
     # graph2 = TileableGraph([df1.data])
     # next(TileableGraphBuilder(graph2).build())
     # optimize(graph2)

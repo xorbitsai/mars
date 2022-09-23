@@ -36,7 +36,10 @@ class InputColumnSelector:
     ) -> Dict[TileableData, Set[Any]]:
         ret = {}
         for inp in tileable_data.op.inputs:
-            ret[inp] = set(inp.dtypes.index.tolist())
+            if isinstance(inp, DataFrameData):
+                ret[inp] = required_cols.intersection(set(inp.dtypes.index))
+            else:
+                ret[inp] = required_cols.intersection({inp.name})
         return ret
 
     @staticmethod
@@ -45,7 +48,10 @@ class InputColumnSelector:
     ) -> Dict[TileableData, Set[Any]]:
         ret = {}
         for inp in tileable_data.op.inputs:
-            ret[inp] = required_cols.intersection(set(inp.dtypes.index))
+            if isinstance(inp, DataFrameData):
+                ret[inp] = required_cols.intersection(set(inp.dtypes.index))
+            else:
+                ret[inp] = required_cols.intersection({inp.name})
         return ret
 
     @classmethod
@@ -83,11 +89,13 @@ class InputColumnSelector:
             key is a predecessor of the given tileable data, and the value is a list of column names that the given
             tileable data depends on.
         """
-
-        for op_cls in type(tileable_data.op).__mro__:
+        op_type = type(tileable_data.op)
+        if op_type in cls._OP_TO_SELECT_FUNCTION:
+            return cls._OP_TO_SELECT_FUNCTION[op_type](tileable_data, required_cols)
+        for op_cls in op_type.__mro__:
             if op_cls in cls._OP_TO_SELECT_FUNCTION:
+                cls._OP_TO_SELECT_FUNCTION[op_type] = cls._OP_TO_SELECT_FUNCTION[op_cls]
                 return cls._OP_TO_SELECT_FUNCTION[op_cls](tileable_data, required_cols)
-
         return cls.select_all_input_columns(tileable_data, required_cols)
 
 

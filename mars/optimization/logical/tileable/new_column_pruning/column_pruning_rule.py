@@ -1,3 +1,17 @@
+# Copyright 2022 XProbe Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Any, Collection
 
 import pandas as pd
@@ -16,6 +30,7 @@ from .....dataframe.indexing.loc import DataFrameLocGetItem
 from .....dataframe.merge import DataFrameMerge
 from .....typing import OperandType, EntityType
 from .....utils import implements
+from .input_column_selector import InputColumnSelector
 
 
 @register_tileable_optimization_rule([Operand])
@@ -24,14 +39,21 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
 
     def _get_selected_columns(self, entity: EntityType):
         selected_columns = set()
-        for successor in list(self._graph.successors(entity)):
-            if self._is_skipped_type(successor):
-                continue
+        successors = list(self._graph.successors(entity))
+        if successors:
+            for successor in successors:
+                if self._is_skipped_type(successor):
+                    continue
 
-            selected_columns = selected_columns | set(
-                list(self.context[successor][entity])
-            )
-        return selected_columns
+                selected_columns = selected_columns | set(
+                    list(self.context[successor][entity])
+                )
+            return selected_columns
+        else:
+            if isinstance(entity, DataFrameData):
+                return set(entity.dtypes.index)
+            else:
+                return {entity.name}
 
     @implements(CommonGraphOptimizationRule.apply)
     def apply(self, op: OperandType):
@@ -40,15 +62,18 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                 continue
 
             cur_cols = set()
-            for successor in list(self._graph.successors(entity)):
-                if successor in self.context and entity in self.context[successor]:
-                    cur_cols = cur_cols | set(list(self.context[successor][entity]))
+            successors = self._graph.successors(entity)
+            if successors:
+                for successor in successors:
+                    if successor in self.context and entity in self.context[successor]:
+                        cur_cols = cur_cols | set(list(self.context[successor][entity]))
+            else:
+                if isinstance(entity, DataFrameData):
+                    cur_cols = set(entity.dtypes.index)
+                else:
+                    cur_cols = {entity.name}
 
-            # TODO invoke
-            dependency: dict = {
-                e: ["c1", "c2"] for e in self._graph.predecessors(entity)
-            }
-            self.context[entity] = dependency
+            self.context[entity] = InputColumnSelector.select_input_columns(entity, cur_cols)
 
         # Modify DAG
         node_list = list(self._graph.topological_iter())
