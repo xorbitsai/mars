@@ -54,15 +54,16 @@ def test_group_by(setup, gen_data1):
     graph = c.build_graph()
     optimize(graph)
     groupby_agg_node = graph.result_tileables[0]
-    assert type(groupby_agg_node) is SeriesData
+    assert isinstance(groupby_agg_node, SeriesData)
+    assert isinstance(groupby_agg_node.op, DataFrameGroupByAgg)
     assert type(groupby_agg_node.op) is DataFrameGroupByAgg
     assert groupby_agg_node.name == "c2"
 
     groupby_agg_node_preds = graph.predecessors(groupby_agg_node)
     assert len(groupby_agg_node_preds) == 1
     read_csv_node = groupby_agg_node_preds[0]
-    assert type(read_csv_node) is DataFrameData
-    assert type(read_csv_node.op) is DataFrameReadCSV
+    assert isinstance(read_csv_node, DataFrameData)
+    assert isinstance(read_csv_node.op, DataFrameReadCSV)
     assert len(read_csv_node.op.usecols) == 2
     assert len({"c1", "c2"} ^ set(read_csv_node.op.usecols)) == 0
 

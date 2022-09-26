@@ -18,7 +18,12 @@ from typing import Callable, Dict, Any, Set
 from .....core import TileableData
 from .....dataframe import NamedAgg
 from .....dataframe.arithmetic.core import DataFrameBinOp, DataFrameUnaryOp
-from .....dataframe.core import DataFrameData
+from .....dataframe.core import (
+    DataFrameData,
+    SeriesData,
+    DataFrameGroupByData,
+    SeriesGroupByData,
+)
 from .....dataframe.groupby.aggregation import DataFrameGroupByAgg
 from .....dataframe.indexing.getitem import DataFrameIndex
 from .....dataframe.indexing.setitem import DataFrameSetitem
@@ -36,9 +41,9 @@ class InputColumnSelector:
     ) -> Dict[TileableData, Set[Any]]:
         ret = {}
         for inp in tileable_data.op.inputs:
-            if isinstance(inp, DataFrameData):
+            if isinstance(inp, (DataFrameData, DataFrameGroupByData)):
                 ret[inp] = set(inp.dtypes.index)
-            else:
+            elif isinstance(inp, (SeriesData, SeriesGroupByData)):
                 ret[inp] = {inp.name}
         return ret
 
@@ -50,8 +55,8 @@ class InputColumnSelector:
         for inp in tileable_data.op.inputs:
             if isinstance(inp, DataFrameData):
                 ret[inp] = required_cols.intersection(set(inp.dtypes.index))
-            else:
-                ret[inp] = required_cols.intersection({inp.name})
+            elif isinstance(inp, SeriesData):
+                ret[inp] = {inp.name}
         return ret
 
     @classmethod
@@ -99,6 +104,15 @@ class InputColumnSelector:
         return cls.select_all_input_columns(tileable_data, required_cols)
 
 
+def registe_selector(op_type: OperandType):
+    def wrap(selector_func: Callable):
+        InputColumnSelector.register(op_type, selector_func)
+        return selector_func
+
+    return wrap
+
+
+@registe_selector(DataFrameMerge)
 def df_merge_select_function(
     tileable_data: TileableData, required_cols: Set[Any]
 ) -> Dict[TileableData, Set[Any]]:
@@ -139,6 +153,21 @@ def df_merge_select_function(
     return ret
 
 
+def _get_by_cols(inp: DataFrameData, by: Any) -> Set:
+    cols = []
+    if isinstance(by, (list, tuple)):
+        for col in by:
+            if col in inp.dtypes.index:
+                # exclude index
+                cols.append(col)
+    else:
+        if by in inp.dtypes.index:
+            # exclude index
+            cols.append(by)
+    return set(cols)
+
+
+@registe_selector(DataFrameGroupByAgg)
 def df_groupby_agg_select_function(
     tileable_data: TileableData, required_cols: Set[Any]
 ) -> Dict[TileableData, Set[Any]]:
@@ -150,19 +179,14 @@ def df_groupby_agg_select_function(
 
     selected_cols = set()
     # group by keys should be included
-    if isinstance(by, (list, tuple)):
-        for col in by:
-            if col in inp.dtypes.index:
-                # exclude index
-                selected_cols.update(by)
-    else:
-        if by in inp.dtypes.index:
-            # exclude index
-            selected_cols.add(by)
+    selected_cols.update(_get_by_cols(inp, by))
 
     # add agg columns
     if op.raw_func is not None:
-        if isinstance(raw_func, dict):
+        if op.raw_func == "size":
+            # special for size, its return value is always series
+            pass
+        elif isinstance(raw_func, dict):
             selected_cols.update(set(raw_func.keys()))
         else:
             # no specified agg columns
@@ -181,20 +205,30 @@ def df_groupby_agg_select_function(
                 assert isinstance(origin, tuple)
                 selected_cols.add(origin[0])
 
-    return {inp: selected_cols}
+    return {inp: selected_cols.intersection(inp.dtypes.index)}
 
 
-InputColumnSelector.register(DataFrameMerge, df_merge_select_function)
-InputColumnSelector.register(
-    DataFrameSetitem, InputColumnSelector.select_required_input_columns
-)
-InputColumnSelector.register(
-    DataFrameBinOp, InputColumnSelector.select_required_input_columns
-)
-InputColumnSelector.register(
-    DataFrameUnaryOp, InputColumnSelector.select_required_input_columns
-)
-InputColumnSelector.register(
-    DataFrameIndex, InputColumnSelector.select_required_input_columns
-)
-InputColumnSelector.register(DataFrameGroupByAgg, df_groupby_agg_select_function)
+@registe_selector(DataFrameSetitem)
+def df_setitem_select_function(
+    tileable_data: TileableData, required_cols: Set[Any]
+) -> Dict[TileableData, Set[Any]]:
+    if len(tileable_data.inputs) == 1:
+        # if value is not a Mars object, return required input columns
+        return InputColumnSelector.select_required_input_columns(
+            tileable_data, required_cols
+        )
+    else:
+        # if value is a Mars object, return all columns
+        df, value = tileable_data.inputs
+        if isinstance(value, DataFrameData):
+            value_cols = set(value.dtypes.index)
+        else:
+            value_cols = {value.name}
+        return {df: required_cols.intersection(set(df.dtypes.index)), value: value_cols}
+
+
+SELECT_REQUIRED_OP_TYPES = [DataFrameBinOp, DataFrameUnaryOp, DataFrameIndex]
+for op_type in SELECT_REQUIRED_OP_TYPES:
+    InputColumnSelector.register(
+        op_type, InputColumnSelector.select_required_input_columns
+    )
