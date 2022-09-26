@@ -86,7 +86,7 @@ class InputColumnSelector:
         tileable_data : TileableData
             The tileable data to be processed.
         required_cols: List[Any]
-            Names of columns required by the successors of the given tileable data. The data type can be int or str.
+            Names of columns required by the successors of the given tileable data. TODO docstring
         Returns
         -------
         Dict[TileableData: List[Any]]
@@ -94,6 +94,9 @@ class InputColumnSelector:
             key is a predecessor of the given tileable data, and the value is a list of column names that the given
             tileable data depends on.
         """
+        if required_cols is None:
+            return cls.select_all_input_columns(tileable_data, set())
+
         op_type = type(tileable_data.op)
         if op_type in cls._OP_TO_SELECT_FUNCTION:
             return cls._OP_TO_SELECT_FUNCTION[op_type](tileable_data, required_cols)
@@ -104,7 +107,7 @@ class InputColumnSelector:
         return cls.select_all_input_columns(tileable_data, required_cols)
 
 
-def registe_selector(op_type: OperandType):
+def register_selector(op_type: OperandType):
     def wrap(selector_func: Callable):
         InputColumnSelector.register(op_type, selector_func)
         return selector_func
@@ -112,7 +115,7 @@ def registe_selector(op_type: OperandType):
     return wrap
 
 
-@registe_selector(DataFrameMerge)
+@register_selector(DataFrameMerge)
 def df_merge_select_function(
     tileable_data: TileableData, required_cols: Set[Any]
 ) -> Dict[TileableData, Set[Any]]:
@@ -167,7 +170,7 @@ def _get_by_cols(inp: DataFrameData, by: Any) -> Set:
     return set(cols)
 
 
-@registe_selector(DataFrameGroupByAgg)
+@register_selector(DataFrameGroupByAgg)
 def df_groupby_agg_select_function(
     tileable_data: TileableData, required_cols: Set[Any]
 ) -> Dict[TileableData, Set[Any]]:
@@ -208,7 +211,7 @@ def df_groupby_agg_select_function(
     return {inp: selected_cols.intersection(inp.dtypes.index)}
 
 
-@registe_selector(DataFrameSetitem)
+@register_selector(DataFrameSetitem)
 def df_setitem_select_function(
     tileable_data: TileableData, required_cols: Set[Any]
 ) -> Dict[TileableData, Set[Any]]:

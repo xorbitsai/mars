@@ -56,11 +56,17 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
         else:
             return self._get_all_columns(entity)
 
-    def _get_all_columns(self, entity: EntityType):
-        if hasattr(entity, "dtypes"):
+    @staticmethod
+    def _get_all_columns(entity: EntityType):
+        """
+        TODO docstrings
+        """
+        if getattr(entity, "dtypes", None) is not None:
             return set(entity.dtypes.index)
         elif isinstance(entity, BaseSeriesData):
             return {entity.name}
+        else:
+            return None
 
     def _get_successors(self, entity: EntityType):
         """
@@ -94,9 +100,9 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
             if self._is_skipped_type(entity):
                 continue
 
-            selected_columns = self._get_selected_columns(entity)
             op = entity.op
             if isinstance(op, ColumnPruneSupportedDataSourceMixin):
+                selected_columns = self._get_selected_columns(entity)
                 op.set_pruned_columns(list(selected_columns))
                 self.effective = True
                 pruned_nodes.append(entity)
