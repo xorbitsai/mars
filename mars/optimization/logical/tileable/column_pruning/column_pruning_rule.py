@@ -37,7 +37,7 @@ from .....utils import implements
 from .input_column_selector import InputColumnSelector
 
 
-CAN_BE_OPTIMIZED_OP_TYPES = (DataFrameMerge, DataFrameGroupByAgg)
+OPTIMIZABLE_OP_TYPES = (DataFrameMerge, DataFrameGroupByAgg)
 
 
 @register_tileable_optimization_rule([Operand])
@@ -76,6 +76,9 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
             return []
 
     def _select_columns(self):
+        """
+        Select required columns for each entity in the graph.
+        """
         for entity in self._graph.topological_iter(reverse=True):
             if self._is_skipped_type(entity):
                 continue
@@ -85,7 +88,6 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
 
     def _insert_getitem_nodes(self):
         pruned_nodes = []
-        new_nodes = []
         datasource_nodes = []
         node_list = list(self._graph.topological_iter())
         for entity in node_list:
@@ -101,7 +103,7 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                 datasource_nodes.append(entity)
                 continue
 
-            if isinstance(op, CAN_BE_OPTIMIZED_OP_TYPES):
+            if isinstance(op, OPTIMIZABLE_OP_TYPES):
                 predecessors = list(self._graph.predecessors(entity))
                 for predecessor in predecessors:
                     if (
@@ -132,6 +134,7 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                     # update context
                     del self.context[entity][predecessor]
                     self.context[new_node] = {predecessor: pruned_columns}
+                    self.context[entity][new_node] = pruned_columns
 
                     # change edges and nodes
                     self._graph.remove_edge(predecessor, entity)
@@ -148,45 +151,42 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                     entity.inputs[entity.inputs.index(predecessor)] = new_node
                     self.effective = True
                     pruned_nodes.extend([predecessor])
-                    new_nodes.append(new_node)
-        return pruned_nodes, new_nodes
+        return pruned_nodes
 
-    def _update_tileable_params(
-        self, pruned_nodes: List[EntityType], new_nodes: List[EntityType]
-    ):
+    def _update_tileable_params(self, pruned_nodes: List[EntityType]):
         # change dtypes and columns_value
         queue = [n for n in pruned_nodes]
         affected_nodes = set()
         while len(queue) > 0:
             node = queue.pop(0)
-            nodes = self._graph.successors(node)
-            for w in nodes:
-                if w not in affected_nodes:
-                    queue.append(w)
-                    if (w not in new_nodes) and (not self._is_skipped_type(w)):
-                        affected_nodes.add(w)
+            for successor in self._graph.successors(node):
+                if successor not in affected_nodes:
+                    queue.append(successor)
+                    if not self._is_skipped_type(successor):
+                        affected_nodes.add(successor)
 
         for node in affected_nodes:
             selected_columns = self._get_selected_columns(node)
-            if selected_columns:
-                if isinstance(node, BaseDataFrameData):
-                    new_dtypes = pd.Series(
-                        dict(
-                            (col, dtype)
-                            for col, dtype in node.dtypes.iteritems()
-                            if col in selected_columns
-                        )
+            if isinstance(node, BaseDataFrameData) and set(selected_columns) != set(
+                node.dtypes.index
+            ):
+                new_dtypes = pd.Series(
+                    dict(
+                        (col, dtype)
+                        for col, dtype in node.dtypes.iteritems()
+                        if col in selected_columns
                     )
-                    new_columns_value = parse_index(new_dtypes.index, store_data=True)
-                    node._dtypes = new_dtypes
-                    node._columns_value = new_columns_value
-                    node._shape = (node.shape[0], len(new_dtypes))
+                )
+                new_columns_value = parse_index(new_dtypes.index, store_data=True)
+                node._dtypes = new_dtypes
+                node._columns_value = new_columns_value
+                node._shape = (node.shape[0], len(new_dtypes))
 
     @implements(CommonGraphOptimizationRule.apply)
     def apply(self, op: OperandType):
         self._select_columns()
-        pruned_nodes, new_nodes = self._insert_getitem_nodes()
-        self._update_tileable_params(pruned_nodes, new_nodes)
+        pruned_nodes = self._insert_getitem_nodes()
+        self._update_tileable_params(pruned_nodes)
 
     @staticmethod
     def _is_skipped_type(entity: EntityType) -> bool:
