@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Collection, List
+from typing import List
 
 import pandas as pd
 
@@ -25,10 +25,8 @@ from ...core import (
 from .....core.operand import Operand
 from .....dataframe.core import (
     parse_index,
-    DataFrameData,
-    SeriesData,
-    DataFrameGroupByData,
-    SeriesGroupByData,
+    BaseSeriesData,
+    BaseDataFrameData,
 )
 from .....dataframe.datasource.core import ColumnPruneSupportedDataSourceMixin
 from .....dataframe.groupby.aggregation import DataFrameGroupByAgg
@@ -47,47 +45,42 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
     context = {}
 
     def _get_selected_columns(self, entity: EntityType):
-        selected_columns = set()
-        successors = list(self._graph.successors(entity))
+        """
+        Get pruned columns of the given entity.
+        """
+        successors = self._get_successors(entity)
         if successors:
-            for successor in successors:
-                if self._is_skipped_type(successor):
-                    continue
-                if successor not in self.context:
-                    selected_columns = selected_columns | set(successor.dtypes.index)
-                else:
-                    selected_columns = selected_columns | set(
-                        list(self.context[successor][entity])
-                    )
-            return selected_columns
+            return set().union(
+                *[self.context[successor][entity] for successor in successors]
+            )
         else:
-            if isinstance(entity, DataFrameData):
-                return set(entity.dtypes.index)
-            else:
-                return {entity.name}
+            return self._get_all_columns(entity)
+
+    def _get_all_columns(self, entity: EntityType):
+        if hasattr(entity, "dtypes"):
+            return set(entity.dtypes.index)
+        elif isinstance(entity, BaseSeriesData):
+            return {entity.name}
+
+    def _get_successors(self, entity: EntityType):
+        """
+        Get successors of the given entity.
+
+        Column pruning is available only when every successor is available for column pruning (i.e. appears in the
+        context).
+        """
+        successors = list(self._graph.successors(entity))
+        if all(successor in self.context for successor in successors):
+            return successors
+        else:
+            return []
 
     def _select_columns(self):
         for entity in self._graph.topological_iter(reverse=True):
             if self._is_skipped_type(entity):
                 continue
-
-            cur_cols = set()
-            successors = [
-                successor
-                for successor in self._graph.successors(entity)
-                if successor in self.context and entity in self.context[successor]
-            ]
-            if successors:
-                for successor in successors:
-                    cur_cols = cur_cols | set(list(self.context[successor][entity]))
-            else:
-                if isinstance(entity, DataFrameData):
-                    cur_cols = set(entity.dtypes.index)
-                else:
-                    cur_cols = {entity.name}
-
             self.context[entity] = InputColumnSelector.select_input_columns(
-                entity, cur_cols
+                entity, self._get_selected_columns(entity)
             )
 
     def _insert_getitem_nodes(self):
@@ -136,6 +129,10 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                         [predecessor], **new_params
                     ).data
 
+                    # update context
+                    del self.context[entity][predecessor]
+                    self.context[new_node] = {predecessor: pruned_columns}
+
                     # change edges and nodes
                     self._graph.remove_edge(predecessor, entity)
                     self._graph.add_node(new_node)
@@ -172,7 +169,7 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
         for node in affected_nodes:
             selected_columns = self._get_selected_columns(node)
             if selected_columns:
-                if isinstance(node, DataFrameData):
+                if isinstance(node, BaseDataFrameData):
                     new_dtypes = pd.Series(
                         dict(
                             (col, dtype)
@@ -203,6 +200,4 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
         -------
 
         """
-        return not isinstance(
-            entity, (DataFrameData, SeriesData, DataFrameGroupByData, SeriesGroupByData)
-        )
+        return not isinstance(entity, (BaseSeriesData, BaseDataFrameData))
