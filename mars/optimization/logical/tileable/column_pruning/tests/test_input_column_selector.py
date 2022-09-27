@@ -15,9 +15,8 @@
 from typing import Dict, Any, Set
 
 import pytest
-import mars.dataframe as md
-from mars.core import TileableData
-from mars.dataframe import DataFrame
+from ......core import TileableData
+from ......dataframe import DataFrame
 from ..input_column_selector import InputColumnSelector
 
 
@@ -48,10 +47,8 @@ def test_register():
 
 
 def test_col_pruning():
-    import mars.dataframe as md
-
-    left = md.DataFrame({"col1": (1, 2, 3), "col2": (4, 5, 6)})
-    right = md.DataFrame({"col1": (1, 3), "col2": (4, 5), "col3": (5, 8)})
+    left = DataFrame({"col1": (1, 2, 3), "col2": (4, 5, 6)})
+    right = DataFrame({"col1": (1, 3), "col2": (4, 5), "col3": (5, 8)})
     joined = left.merge(right, left_on="col1", right_on="col3")
     input_columns = InputColumnSelector.select_input_columns(joined.data, {"col1"})
     assert left.data in input_columns
@@ -61,7 +58,7 @@ def test_col_pruning():
 
 
 def test_df_group_by_agg():
-    df: DataFrame = md.DataFrame(
+    df: DataFrame = DataFrame(
         {
             "foo": (1, 1, 2, 2),
             "bar": (3, 4, 3, 4),
@@ -102,8 +99,8 @@ def test_df_group_by_agg():
 
 
 def test_df_merge(setup):
-    left: DataFrame = md.DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6), 1: (7, 8, 9)})
-    right = md.DataFrame({"foo": (1, 2), "bar": (4, 5), "baz": (5, 8), 1: (7, 8)})
+    left: DataFrame = DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6), 1: (7, 8, 9)})
+    right = DataFrame({"foo": (1, 2), "bar": (4, 5), "baz": (5, 8), 1: (7, 8)})
 
     joined = left.merge(right, on=["foo"])
 
@@ -147,7 +144,7 @@ def test_df_merge(setup):
 
 
 def test_arithmatic_ops(setup):
-    df: DataFrame = md.DataFrame(
+    df: DataFrame = DataFrame(
         {
             "foo": (1, 1, 2, 2),
             "bar": (3, 4, 3, 4),
@@ -159,7 +156,7 @@ def test_arithmatic_ops(setup):
 
 
 def test_select_all():
-    df: DataFrame = md.DataFrame(
+    df: DataFrame = DataFrame(
         {
             "foo": (1, 1, 2, 2),
             "bar": (3, 4, 3, 4),
