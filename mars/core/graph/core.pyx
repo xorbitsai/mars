@@ -411,7 +411,6 @@ cdef class DAG(DirectedGraph):
         cdef:
             dict preds, succs
             set visited = set()
-            list stack
 
         if len(self) == 0:
             return
@@ -430,11 +429,11 @@ cdef class DAG(DirectedGraph):
 
         succ_checker = succ_checker or _default_succ_checker
 
-        stack = list((p for p, l in preds.items() if len(l) == 0))
+        stack = deque(list((p for p, l in preds.items() if len(l) == 0)))
         if not stack:
             raise GraphContainsCycleError
         while stack:
-            node = stack.pop()
+            node = stack.popleft()
             yield node
             visited.add(node)
             for succ in succs.get(node, {}):

@@ -101,8 +101,10 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                 continue
 
             op = entity.op
-            if isinstance(op, ColumnPruneSupportedDataSourceMixin):
-                selected_columns = self._get_selected_columns(entity)
+            selected_columns = self._get_selected_columns(entity)
+            if isinstance(op, ColumnPruneSupportedDataSourceMixin) and set(
+                selected_columns
+            ) != self._get_all_columns(entity):
                 op.set_pruned_columns(list(selected_columns))
                 self.effective = True
                 pruned_nodes.append(entity)
@@ -119,6 +121,8 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                         continue
 
                     pruned_columns = list(self.context[entity][predecessor])
+                    if set(pruned_columns) == self._get_all_columns(predecessor):
+                        continue
 
                     # new node init
                     new_node_op = DataFrameIndex(
@@ -165,6 +169,8 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
         affected_nodes = set()
         while len(queue) > 0:
             node = queue.pop(0)
+            if isinstance(node.op, ColumnPruneSupportedDataSourceMixin):
+                affected_nodes.add(node)
             for successor in self._graph.successors(node):
                 if successor not in affected_nodes:
                     queue.append(successor)
@@ -193,6 +199,7 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
         self._select_columns()
         pruned_nodes = self._insert_getitem_nodes()
         self._update_tileable_params(pruned_nodes)
+        pass
 
     @staticmethod
     def _is_skipped_type(entity: EntityType) -> bool:

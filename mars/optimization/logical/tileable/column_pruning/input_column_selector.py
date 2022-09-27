@@ -194,7 +194,12 @@ def df_groupby_agg_select_function(
         else:
             # no specified agg columns
             # required_cols should always be a subset of selection
-            selected_cols.update(required_cols)
+            for col in required_cols:
+                # col is a tuple when required col is a MultiIndex
+                if isinstance(col, tuple):
+                    for c in col:
+                        selected_cols.add(c)
+                selected_cols.add(col)
             if selection is not None:
                 selected_cols.update(set(selection)) if isinstance(
                     selection, (list, tuple)
