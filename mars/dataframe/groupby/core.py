@@ -500,7 +500,7 @@ class DataFrameGroupByOperand(MapReduceOperand, DataFrameOperandMixin):
                 level=op.level,
                 as_index=op.as_index,
                 sort=op.sort,
-                group_keys=op.group_keys,
+                group_keys=op.group_keys if op.group_keys is not None else no_default,
             )
 
 

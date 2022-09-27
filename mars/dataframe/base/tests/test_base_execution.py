@@ -1196,7 +1196,7 @@ def test_shift_execution(setup):
     # test freq not None
     for periods in (2, -2):
         for axis in (0, 1):
-            for fill_value in (None, 0, 1.0):
+            for fill_value in (fill_value_default, 0, 1.0):
                 r = df2.shift(
                     periods=periods, freq="D", axis=axis, fill_value=fill_value
                 )
