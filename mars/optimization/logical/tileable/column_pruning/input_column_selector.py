@@ -201,12 +201,13 @@ def df_groupby_agg_select_function(
                         selected_cols.add(c)
                 selected_cols.add(col)
             if selection is not None:
-                selected_cols.update(set(selection)) if isinstance(
-                    selection, (list, tuple)
-                ) else selected_cols.add(selection)
+                if isinstance(selection, (list, tuple)):
+                    selected_cols.update(set(selection))
+                else:
+                    selected_cols.add(selection)
     elif op.raw_func_kw:
         # add renamed columns
-        for new_col, origin in op.raw_func_kw.items():
+        for _, origin in op.raw_func_kw.items():
             if isinstance(origin, NamedAgg):
                 selected_cols.add(origin.column)
             else:

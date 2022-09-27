@@ -199,7 +199,6 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
         self._select_columns()
         pruned_nodes = self._insert_getitem_nodes()
         self._update_tileable_params(pruned_nodes)
-        pass
 
     @staticmethod
     def _is_skipped_type(entity: EntityType) -> bool:
