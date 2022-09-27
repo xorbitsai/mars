@@ -117,6 +117,8 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                     if (
                         self._is_skipped_type(predecessor)
                         or predecessor in datasource_nodes
+                        # if the group by key is a series, no need to do column pruning
+                        or isinstance(predecessor, BaseSeriesData)
                     ):
                         continue
 

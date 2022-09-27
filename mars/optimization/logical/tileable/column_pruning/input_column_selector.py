@@ -180,9 +180,17 @@ def df_groupby_agg_select_function(
     selection = op.groupby_params.get("selection", None)
     raw_func = op.raw_func
 
+    ret = {}
+    # group by a series
+    group_by_series = False
+    if isinstance(by, list) and len(by) == 1 and isinstance(by[0], SeriesData):
+        group_by_series = True
+        ret[by[0]] = by[0].name
+
     selected_cols = set()
     # group by keys should be included
-    selected_cols.update(_get_by_cols(inp, by))
+    if not group_by_series:
+        selected_cols.update(_get_by_cols(inp, by))
 
     # add agg columns
     if op.raw_func is not None:
@@ -214,7 +222,8 @@ def df_groupby_agg_select_function(
                 assert isinstance(origin, tuple)
                 selected_cols.add(origin[0])
 
-    return {inp: selected_cols.intersection(inp.dtypes.index)}
+    ret[inp] = selected_cols.intersection(inp.dtypes.index)
+    return ret
 
 
 @register_selector(DataFrameSetitem)
