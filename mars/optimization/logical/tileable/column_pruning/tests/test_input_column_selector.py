@@ -12,16 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Any, Set
+from typing import Dict, Any, Set, List, Union
 
-import pytest
-from ......core import TileableData
+
+from ......core import TileableData, ENTITY_TYPE
+from ......core.operand import Operand
 from ......dataframe import DataFrame
 from ..input_column_selector import InputColumnSelector
 
 
-class MockOperand:
-    pass
+class MockOperand(Operand):
+
+    _mock_input: TileableData = DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6)}).data
+
+    @property
+    def inputs(self) -> List[Union[ENTITY_TYPE]]:
+        return [self._mock_input]
+
+    @classmethod
+    def get_mock_input(cls) -> TileableData:
+        return cls._mock_input
 
 
 class MockEntityData(TileableData):
@@ -41,9 +51,10 @@ def test_register():
     assert InputColumnSelector.select_input_columns(mock_data, {"foo"}) == {}
 
     # unregister
-    with pytest.raises(AttributeError):
-        InputColumnSelector.unregister(MockOperand)
-        InputColumnSelector.select_input_columns(mock_data, {"foo"})
+    InputColumnSelector.unregister(MockOperand)
+    assert InputColumnSelector.select_input_columns(mock_data, {"foo"}) == {
+        MockOperand.get_mock_input(): {"foo", "bar"}
+    }
 
 
 def test_col_pruning():
@@ -153,6 +164,7 @@ def test_arithmatic_ops(setup):
         }
     )
     df = df
+    # TODO
 
 
 def test_select_all():
