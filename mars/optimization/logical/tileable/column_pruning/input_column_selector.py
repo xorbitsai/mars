@@ -187,42 +187,44 @@ def df_groupby_agg_select_function(
         group_by_series = True
         ret[by[0]] = by[0].name
 
-    selected_cols = set()
-    # group by keys should be included
-    if not group_by_series:
-        selected_cols.update(_get_by_cols(inp, by))
-
-    # add agg columns
-    if op.raw_func is not None:
-        if op.raw_func == "size":
-            # special for size, its return value is always series
-            pass
-        elif isinstance(raw_func, dict):
-            selected_cols.update(set(raw_func.keys()))
-        else:
-            # no specified agg columns
-            # required_cols should always be a subset of selection
-            for col in required_cols:
-                # col is a tuple when required col is a MultiIndex
-                if isinstance(col, tuple):
-                    for c in col:
-                        selected_cols.add(c)
-                selected_cols.add(col)
-            if selection is not None:
-                if isinstance(selection, (list, tuple)):
-                    selected_cols.update(set(selection))
-                else:
-                    selected_cols.add(selection)
-    elif op.raw_func_kw:
-        # add renamed columns
-        for _, origin in op.raw_func_kw.items():
-            if isinstance(origin, NamedAgg):
-                selected_cols.add(origin.column)
+    if isinstance(inp, SeriesData):
+        ret[inp] = {inp.name}
+    else:
+        selected_cols = set()
+        # group by keys should be included
+        if not group_by_series:
+            selected_cols.update(_get_by_cols(inp, by))
+        # add agg columns
+        if op.raw_func is not None:
+            if op.raw_func == "size":
+                # special for size, its return value is always series
+                pass
+            elif isinstance(raw_func, dict):
+                selected_cols.update(set(raw_func.keys()))
             else:
-                assert isinstance(origin, tuple)
-                selected_cols.add(origin[0])
+                # no specified agg columns
+                # required_cols should always be a subset of selection
+                for col in required_cols:
+                    # col is a tuple when required col is a MultiIndex
+                    if isinstance(col, tuple):
+                        for c in col:
+                            selected_cols.add(c)
+                    selected_cols.add(col)
+                if selection is not None:
+                    if isinstance(selection, (list, tuple)):
+                        selected_cols.update(set(selection))
+                    else:
+                        selected_cols.add(selection)
+        elif op.raw_func_kw:
+            # add renamed columns
+            for _, origin in op.raw_func_kw.items():
+                if isinstance(origin, NamedAgg):
+                    selected_cols.add(origin.column)
+                else:
+                    assert isinstance(origin, tuple)
+                    selected_cols.add(origin[0])
 
-    ret[inp] = selected_cols.intersection(inp.dtypes.index)
+        ret[inp] = selected_cols.intersection(inp.dtypes.index)
     return ret
 
 
