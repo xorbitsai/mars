@@ -124,9 +124,10 @@ try:
     def _no_default__reduce__(self):
         if self is not NoDefault:
             return _raw__reduce__(self)
-        return getattr, (_pd__libs_lib, "NoDefault")
+        else:  # pragma: no cover
+            return getattr, (_pd__libs_lib, "NoDefault")
 
-    if hasattr(_pd__libs_lib, "_NoDefault"):
+    if hasattr(_pd__libs_lib, "_NoDefault"):  # pragma: no cover
         # need to patch __reduce__ to make sure it can be properly unpickled
         type(NoDefault).__reduce__ = _no_default__reduce__
     else:

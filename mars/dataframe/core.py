@@ -288,7 +288,7 @@ class IndexValue(Serializable):
             def _build_empty_array(dtype):
                 try:
                     return np.array([], dtype=dtype)
-                except TypeError:
+                except TypeError:  # pragma: no cover
                     return pd.array([], dtype=dtype)
 
             if data is None:

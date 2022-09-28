@@ -458,7 +458,7 @@ def shift(df_or_series, periods=1, freq=None, axis=0, fill_value=None):
     axis = validate_axis(axis, df_or_series)
     if periods == 0:
         return df_or_series.copy()
-    if fill_value is no_default:
+    if fill_value is no_default:  # pragma: no cover
         if not _enable_no_default or (
             _with_column_freq_bug and axis == 1 and freq is not None
         ):

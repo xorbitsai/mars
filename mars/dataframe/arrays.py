@@ -264,7 +264,7 @@ class ArrowArray(ExtensionArray):
             arrow_array = values
         elif isinstance(values, pa.Array):
             arrow_array = pa.chunked_array([values])
-        elif len(values) == 0:
+        elif len(values) == 0:  # pragma: no cover
             arrow_array = pa.chunked_array([pa.array([], type=dtype.arrow_type)])
         else:
             arrow_array = pa.chunked_array([pa.array(values, type=dtype.arrow_type)])

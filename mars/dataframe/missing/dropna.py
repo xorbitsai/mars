@@ -206,7 +206,7 @@ class DataFrameDropNA(DataFrameOperand, DataFrameOperandMixin):
             else:
                 if op.thresh is None or op.thresh is no_default:
                     thresh = op.subset_size
-                else:
+                else:  # pragma: no cover
                     thresh = op.thresh
                 in_counts = in_counts[in_counts >= thresh]
 
