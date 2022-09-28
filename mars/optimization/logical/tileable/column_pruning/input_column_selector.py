@@ -19,10 +19,8 @@ from .....core import TileableData
 from .....dataframe import NamedAgg
 from .....dataframe.arithmetic.core import DataFrameBinOp, DataFrameUnaryOp
 from .....dataframe.core import (
-    DataFrameData,
-    SeriesData,
-    DataFrameGroupByData,
-    SeriesGroupByData,
+    BaseDataFrameData,
+    BaseSeriesData,
 )
 from .....dataframe.groupby.aggregation import DataFrameGroupByAgg
 from .....dataframe.indexing.getitem import DataFrameIndex
@@ -41,9 +39,9 @@ class InputColumnSelector:
     ) -> Dict[TileableData, Set[Any]]:
         ret = {}
         for inp in tileable_data.op.inputs:
-            if isinstance(inp, (DataFrameData, DataFrameGroupByData)):
+            if isinstance(inp, BaseDataFrameData):
                 ret[inp] = set(inp.dtypes.index)
-            elif isinstance(inp, (SeriesData, SeriesGroupByData)):
+            elif isinstance(inp, BaseSeriesData):
                 ret[inp] = {inp.name}
         return ret
 
@@ -53,9 +51,9 @@ class InputColumnSelector:
     ) -> Dict[TileableData, Set[Any]]:
         ret = {}
         for inp in tileable_data.op.inputs:
-            if isinstance(inp, DataFrameData):
+            if isinstance(inp, BaseDataFrameData):
                 ret[inp] = required_cols.intersection(set(inp.dtypes.index))
-            elif isinstance(inp, SeriesData):
+            elif isinstance(inp, BaseSeriesData):
                 ret[inp] = {inp.name}
         return ret
 
@@ -120,8 +118,11 @@ def df_merge_select_function(
     tileable_data: TileableData, required_cols: Set[Any]
 ) -> Dict[TileableData, Set[Any]]:
     op: DataFrameMerge = tileable_data.op
-    left_data: DataFrameData = op.inputs[0]
-    right_data: DataFrameData = op.inputs[1]
+    assert len(op.inputs) == 2
+    assert isinstance(op.inputs[0], BaseDataFrameData)
+    assert isinstance(op.inputs[1], BaseDataFrameData)
+    left_data: BaseDataFrameData = op.inputs[0]
+    right_data: BaseDataFrameData = op.inputs[1]
 
     ret = defaultdict(set)
     for df, suffix in zip([left_data, right_data], op.suffixes):
@@ -134,40 +135,28 @@ def df_merge_select_function(
                     ret[df].add(col)
 
     if op.on is not None:
-        if isinstance(op.on, (list, tuple)):
-            ret[left_data].update(op.on)
-            ret[right_data].update(op.on)
-        else:
-            ret[left_data].add(op.on)
-            ret[right_data].add(op.on)
-
+        ret[left_data].update(_get_cols_exclude_index(left_data, op.on))
+        ret[right_data].update(_get_cols_exclude_index(right_data, op.on))
     if op.left_on is not None:
-        if isinstance(op.left_on, (list, tuple)):
-            ret[left_data].update(op.left_on)
-        else:
-            ret[left_data].add(op.left_on)
-
+        ret[left_data].update(_get_cols_exclude_index(left_data, op.left_on))
     if op.right_on is not None:
-        if isinstance(op.right_on, (list, tuple)):
-            ret[right_data].update(op.right_on)
-        else:
-            ret[right_data].add(op.right_on)
+        ret[right_data].update(_get_cols_exclude_index(right_data, op.right_on))
 
     return ret
 
 
-def _get_by_cols(inp: DataFrameData, by: Any) -> Set:
-    cols = []
-    if isinstance(by, (list, tuple)):
-        for col in by:
+def _get_cols_exclude_index(inp: BaseDataFrameData, cols: Any) -> Set:
+    ret = set()
+    if isinstance(cols, (list, tuple)):
+        for col in cols:
             if col in inp.dtypes.index:
                 # exclude index
-                cols.append(col)
+                ret.add(col)
     else:
-        if by in inp.dtypes.index:
+        if cols in inp.dtypes.index:
             # exclude index
-            cols.append(by)
-    return set(cols)
+            ret.add(cols)
+    return ret
 
 
 @register_selector(DataFrameGroupByAgg)
@@ -175,7 +164,8 @@ def df_groupby_agg_select_function(
     tileable_data: TileableData, required_cols: Set[Any]
 ) -> Dict[TileableData, Set[Any]]:
     op: DataFrameGroupByAgg = tileable_data.op
-    inp: DataFrameData = op.inputs[0]
+    assert isinstance(op.inputs[0], (BaseDataFrameData, BaseSeriesData))
+    inp: BaseDataFrameData = op.inputs[0]
     by = op.groupby_params["by"]
     selection = op.groupby_params.get("selection", None)
     raw_func = op.raw_func
@@ -183,17 +173,17 @@ def df_groupby_agg_select_function(
     ret = {}
     # group by a series
     group_by_series = False
-    if isinstance(by, list) and len(by) == 1 and isinstance(by[0], SeriesData):
+    if isinstance(by, list) and len(by) == 1 and isinstance(by[0], BaseSeriesData):
         group_by_series = True
         ret[by[0]] = by[0].name
 
-    if isinstance(inp, SeriesData):
+    if isinstance(inp, BaseSeriesData):
         ret[inp] = {inp.name}
     else:
         selected_cols = set()
         # group by keys should be included
         if not group_by_series:
-            selected_cols.update(_get_by_cols(inp, by))
+            selected_cols.update(_get_cols_exclude_index(inp, by))
         # add agg columns
         if op.raw_func is not None:
             if op.raw_func == "size":
@@ -238,13 +228,16 @@ def df_setitem_select_function(
             tileable_data, required_cols
         )
     else:
-        # if value is a Mars object, return all columns
         df, value = tileable_data.inputs
-        if isinstance(value, DataFrameData):
+        ret = {df: required_cols.intersection(set(df.dtypes.index))}
+        # if value is a Mars object, return all its columns so that setitem can be executed
+        if isinstance(value, BaseDataFrameData):
             value_cols = set(value.dtypes.index)
-        else:
+            ret[value] = value_cols
+        elif isinstance(value, BaseSeriesData):
             value_cols = {value.name}
-        return {df: required_cols.intersection(set(df.dtypes.index)), value: value_cols}
+            ret[value] = value_cols
+        return ret
 
 
 SELECT_REQUIRED_OP_TYPES = [DataFrameBinOp, DataFrameUnaryOp, DataFrameIndex]
