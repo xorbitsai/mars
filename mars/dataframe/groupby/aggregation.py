@@ -1354,6 +1354,12 @@ class DataFrameGroupByAggNunique(DataFrameGroupByAgg):
         if op.output_types[0] == OutputType.series:
             res = res.squeeze()
 
+        if getattr(op, "size_recorder_name", None) is not None:
+            # record_size
+            raw_size = estimate_pandas_size(in_data)
+            agg_size = estimate_pandas_size(res)
+            size_recorder = ctx.get_remote_object(op.size_recorder_name)
+            size_recorder.record(raw_size, agg_size)
         ctx[op.outputs[0].key] = res
 
     @classmethod
@@ -1464,7 +1470,7 @@ def agg(groupby, func=None, method="auto", combine_size=None, *args, **kwargs):
         agg_op = DataFrameGroupByAggNunique(
             raw_func=func,
             raw_func_kw=kwargs,
-            method="shuffle",
+            method="auto",
             groupby_params=groupby.op.groupby_params,
             combine_size=combine_size or options.combine_size,
             chunk_store_limit=options.chunk_store_limit,
