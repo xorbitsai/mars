@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import time
 from collections import OrderedDict
 
 import numpy as np
@@ -1433,3 +1433,69 @@ def test_groupby_nunique(setup):
             .nunique()
             .sort_values(by="b", ignore_index=True),
         )
+
+
+def test_groupby_nunique_with_index(setup):
+    rs = np.random.RandomState(0)
+    data_size = 100
+    data_dict = {
+        "a": rs.randint(0, 10, size=(data_size,)),
+        "b": rs.choice(list("abcd"), size=(data_size,)),
+        "c": rs.choice(list("abcd"), size=(data_size,)),
+    }
+    df1 = pd.DataFrame(data_dict)
+    mdf = md.DataFrame(df1, chunk_size=13)
+
+    r = mdf.groupby("b", as_index=False, sort=False)["a"].nunique().execute().fetch()
+
+    expected = df1.groupby("b", as_index=False, sort=False)["a"].nunique()
+    pd.testing.assert_frame_equal(r, expected)
+
+
+def test_groupby_nunique_frame(setup):
+    rs = np.random.RandomState(0)
+    data_size = 100
+    data_dict = {
+        "a": rs.randint(0, 10, size=(data_size,)),
+        "b": rs.choice(list("abcd"), size=(data_size,)),
+        "c": rs.choice(list("abcd"), size=(data_size,)),
+    }
+    df1 = pd.DataFrame(data_dict)
+    mdf = md.DataFrame(df1, chunk_size=13)
+
+    r = mdf.groupby("b")["a", "c"].nunique().execute().fetch()
+
+    expected = df1.groupby("b")["a", "c"].nunique()
+    pd.testing.assert_frame_equal(r, expected)
+
+
+def test_groupby_nunique_multiindex(setup):
+    rs = np.random.RandomState(0)
+    data_size = 100
+    data_dict = {
+        "a": rs.randint(0, 10, size=(data_size,)),
+        "b": rs.choice(list("abcd"), size=(data_size,)),
+        "c": rs.choice(list("abcd"), size=(data_size,)),
+        "d": rs.choice(list("abcd"), size=(data_size,)),
+    }
+    df1 = pd.DataFrame(data_dict)
+    mdf = md.DataFrame(df1, chunk_size=13)
+
+    r = mdf.groupby(["b", "c"])["a", "d"].nunique().execute().fetch()
+
+    expected = df1.groupby(["b", "c"])["a", "d"].nunique()
+    pd.testing.assert_frame_equal(r, expected)
+
+
+def test_groupby_nunique4(setup):
+    start = time.time()
+    df = md.read_parquet("/Users/lichengjie/Downloads/data-1G/lineitem.pq").execute()
+    t = time.time()
+    print(f"Read time: {t - start}")
+    res = (
+        df.loc[:, ["L_ORDERKEY", "L_SUPPKEY"]]
+        .groupby("L_ORDERKEY")["L_SUPPKEY"]
+        .nunique()
+    )
+    print(res.execute())
+    print(f"Total time: {time.time() - t}")

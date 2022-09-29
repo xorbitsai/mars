@@ -20,6 +20,7 @@ from typing import Callable, Dict, List
 
 import numpy as np
 import pandas as pd
+from pandas import MultiIndex
 
 from ... import opcodes as OperandDef
 from ...config import options
@@ -1296,6 +1297,105 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             pd.reset_option("mode.use_inf_as_na")
 
 
+class DataFrameGroupByAggNunique(DataFrameGroupByAgg):
+    @classmethod
+    def tile(cls, op: "DataFrameGroupByAggNunique"):
+        in_df = op.inputs[0]
+        if len(in_df.shape) > 1:
+            in_df = build_concatenated_rows_frame(in_df)
+        out_df = op.outputs[0]
+
+        # just init an empty ReductionSteps obj
+        func_infos = ReductionSteps(pre_funcs=[], agg_funcs=[], post_funcs=[])
+        if op.method == "auto":
+            logger.debug("Choose auto method for groupby operand %s", op)
+            if len(in_df.chunks) <= op.combine_size:
+                return cls._tile_with_tree(op, in_df, out_df, func_infos)
+            else:
+                return (yield from cls._tile_auto(op, in_df, out_df, func_infos))
+        if op.method == "shuffle":
+            logger.debug("Choose shuffle method for groupby operand %s", op)
+            return cls._tile_with_shuffle(op, in_df, out_df, func_infos)
+        elif op.method == "tree":
+            logger.debug("Choose tree method for groupby operand %s", op)
+            return cls._tile_with_tree(op, in_df, out_df, func_infos)
+        else:  # pragma: no cover
+            raise NotImplementedError
+
+    @classmethod
+    def _get_selection_columns(cls, op: "DataFrameGroupByAggNunique"):
+        # todo
+        selection = op.groupby_params["selection"]
+        if type(selection) is tuple:
+            selection = [n for n in selection]
+        else:
+            selection = [selection]
+        selection.extend(op.groupby_params["by"])
+        return selection
+
+    @classmethod
+    def _execute_map(cls, ctx, op: "DataFrameGroupByAggNunique"):
+        xdf = cudf if op.gpu else pd
+        in_data = ctx[op.inputs[0].key]
+        if (
+            isinstance(in_data, xdf.Series)
+            and op.output_types[0] == OutputType.dataframe
+        ):
+            in_data = cls._series_to_df(in_data, op.gpu)
+
+        cols = cls._get_selection_columns(op)
+
+        res = (
+            in_data[cols]
+            .drop_duplicates(subset=cols)
+            .set_index(op.groupby_params["by"])
+        )
+
+        if op.output_types[0] == OutputType.series:
+            res = res.squeeze()
+
+        ctx[op.outputs[0].key] = res
+
+    @classmethod
+    def _execute_combine(cls, ctx, op: "DataFrameGroupByAggNunique"):
+        xdf = cudf if op.gpu else pd
+        in_data = ctx[op.inputs[0].key]
+        if (
+            isinstance(in_data, xdf.Series)
+            and op.output_types[0] == OutputType.dataframe
+        ):
+            in_data = cls._series_to_df(in_data, op.gpu)
+
+        # in_data.index.names means MultiIndex (groupby on multi cols)
+        index_col = in_data.index.name or in_data.index.names
+        res = in_data.reset_index().drop_duplicates().set_index(index_col)
+        if op.output_types[0] == OutputType.series:
+            res = res.squeeze()
+        ctx[op.outputs[0].key] = res
+
+    @classmethod
+    def _execute_agg(cls, ctx, op: "DataFrameGroupByAggNunique"):
+        xdf = cudf if op.gpu else pd
+        out_chunk = op.outputs[0]
+
+        in_data = ctx[op.inputs[0].key]
+        if (
+            isinstance(in_data, xdf.Series)
+            and op.output_types[0] == OutputType.dataframe
+        ):
+            in_data = cls._series_to_df(in_data, op.gpu)
+
+        groupby_params = op.groupby_params.copy()
+        # TODO how to handle level
+        if op.output_types[0] == OutputType.dataframe:
+            groupby_params.pop("level")
+            groupby_params["by"] = in_data.index.name or in_data.index.names
+            in_data = in_data.reset_index()
+
+        res = in_data.groupby(**groupby_params).nunique()
+        ctx[out_chunk.key] = res
+
+
 def agg(groupby, func=None, method="auto", combine_size=None, *args, **kwargs):
     """
     Aggregate using one or more operations on grouped data.
@@ -1331,8 +1431,9 @@ def agg(groupby, func=None, method="auto", combine_size=None, *args, **kwargs):
         raise ValueError(
             f"Method {method} is not available, please specify 'tree' or 'shuffle"
         )
+    is_nunique_func: bool = type(func) is str and func == "nunique"
 
-    if not is_funcs_aggregate(func, ndim=groupby.ndim):
+    if not is_funcs_aggregate(func, ndim=groupby.ndim) and not is_nunique_func:
         # pass index to transform, otherwise it will lose name info for index
         agg_result = build_mock_agg_result(
             groupby, groupby.op.groupby_params, func, **kwargs
@@ -1351,13 +1452,25 @@ def agg(groupby, func=None, method="auto", combine_size=None, *args, **kwargs):
         )
 
     use_inf_as_na = kwargs.pop("_use_inf_as_na", options.dataframe.mode.use_inf_as_na)
-    agg_op = DataFrameGroupByAgg(
-        raw_func=func,
-        raw_func_kw=kwargs,
-        method=method,
-        groupby_params=groupby.op.groupby_params,
-        combine_size=combine_size or options.combine_size,
-        chunk_store_limit=options.chunk_store_limit,
-        use_inf_as_na=use_inf_as_na,
-    )
+
+    if is_nunique_func:
+        agg_op = DataFrameGroupByAggNunique(
+            raw_func=func,
+            raw_func_kw=kwargs,
+            method="tree",
+            groupby_params=groupby.op.groupby_params,
+            combine_size=combine_size or options.combine_size,
+            chunk_store_limit=options.chunk_store_limit,
+            use_inf_as_na=use_inf_as_na,
+        )
+    else:
+        agg_op = DataFrameGroupByAgg(
+            raw_func=func,
+            raw_func_kw=kwargs,
+            method=method,
+            groupby_params=groupby.op.groupby_params,
+            combine_size=combine_size or options.combine_size,
+            chunk_store_limit=options.chunk_store_limit,
+            use_inf_as_na=use_inf_as_na,
+        )
     return agg_op(groupby)
