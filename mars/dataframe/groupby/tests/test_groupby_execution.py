@@ -1446,7 +1446,8 @@ def test_groupby_nunique_with_index(setup):
     df1 = pd.DataFrame(data_dict)
     mdf = md.DataFrame(df1, chunk_size=13)
 
-    r = mdf.groupby("b", as_index=False, sort=False)["a"].nunique().execute().fetch()
+    r = mdf.groupby("b", as_index=False, sort=False)["a"].nunique(method='shuffle').execute().fetch()
+    print(r)
 
     expected = df1.groupby("b", as_index=False, sort=False)["a"].nunique()
     pd.testing.assert_frame_equal(r, expected)

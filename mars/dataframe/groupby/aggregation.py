@@ -1457,7 +1457,7 @@ def agg(groupby, func=None, method="auto", combine_size=None, *args, **kwargs):
         agg_op = DataFrameGroupByAggNunique(
             raw_func=func,
             raw_func_kw=kwargs,
-            method="tree",
+            method="shuffle",
             groupby_params=groupby.op.groupby_params,
             combine_size=combine_size or options.combine_size,
             chunk_store_limit=options.chunk_store_limit,
