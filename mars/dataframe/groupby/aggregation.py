@@ -1386,13 +1386,20 @@ class DataFrameGroupByAggNunique(DataFrameGroupByAgg):
             in_data = cls._series_to_df(in_data, op.gpu)
 
         groupby_params = op.groupby_params.copy()
+        cols = in_data.index.name or in_data.index.names
         # TODO how to handle level
         if op.output_types[0] == OutputType.dataframe:
             groupby_params.pop("level")
-            groupby_params["by"] = in_data.index.name or in_data.index.names
+            groupby_params["by"] = cols
             in_data = in_data.reset_index()
 
-        res = in_data.groupby(**groupby_params).nunique()
+        # groupby_params['by'] = 'L_ORDERKEY'
+        # groupby_params.pop('level', None)
+        res = in_data.drop_duplicates().groupby(**groupby_params).count()
+        # r.columns = ['L_ORDERKEY', 'L_SUPPKEY']
+        # res = r.set_index('L_ORDERKEY').groupby(**groupby_params).count()
+        # s = pd.Series(res.set_index(res.columns[0]))
+        # print(res)
         ctx[out_chunk.key] = res
 
 
