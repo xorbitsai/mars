@@ -1326,7 +1326,7 @@ class DataFrameGroupByAggNunique(DataFrameGroupByAgg):
     def _get_selection_columns(cls, op: "DataFrameGroupByAggNunique"):
         # todo
         selection = op.groupby_params["selection"]
-        if type(selection) is tuple:
+        if isinstance(selection, (tuple, list)):
             selection = [n for n in selection]
         else:
             selection = [selection]
@@ -1393,19 +1393,14 @@ class DataFrameGroupByAggNunique(DataFrameGroupByAgg):
 
         groupby_params = op.groupby_params.copy()
         cols = in_data.index.name or in_data.index.names
-        # TODO how to handle level
+        # TODO how to handle group by level
         if op.output_types[0] == OutputType.dataframe:
             groupby_params.pop("level")
             groupby_params["by"] = cols
             in_data = in_data.reset_index()
 
-        # groupby_params['by'] = 'L_ORDERKEY'
-        # groupby_params.pop('level', None)
-        res = in_data.drop_duplicates().groupby(**groupby_params).count()
-        # r.columns = ['L_ORDERKEY', 'L_SUPPKEY']
-        # res = r.set_index('L_ORDERKEY').groupby(**groupby_params).count()
-        # s = pd.Series(res.set_index(res.columns[0]))
-        # print(res)
+        # res = in_data.drop_duplicates().groupby(**groupby_params).count()
+        res = in_data.groupby(**groupby_params).nunique()
         ctx[out_chunk.key] = res
 
 
@@ -1470,7 +1465,7 @@ def agg(groupby, func=None, method="auto", combine_size=None, *args, **kwargs):
         agg_op = DataFrameGroupByAggNunique(
             raw_func=func,
             raw_func_kw=kwargs,
-            method="auto",
+            method=method,
             groupby_params=groupby.op.groupby_params,
             combine_size=combine_size or options.combine_size,
             chunk_store_limit=options.chunk_store_limit,
