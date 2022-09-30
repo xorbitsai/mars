@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
 from collections import OrderedDict
 
 import numpy as np
@@ -1435,7 +1434,8 @@ def test_groupby_nunique(setup):
         )
 
 
-def test_groupby_nunique_with_index(setup):
+@pytest.fixture
+def gen_data():
     rs = np.random.RandomState(0)
     data_size = 100
     data_dict = {
@@ -1443,8 +1443,52 @@ def test_groupby_nunique_with_index(setup):
         "b": rs.choice(list("abcd"), size=(data_size,)),
         "c": rs.choice(list("abcd"), size=(data_size,)),
     }
-    df1 = pd.DataFrame(data_dict)
-    mdf = md.DataFrame(df1, chunk_size=13)
+    df = pd.DataFrame(data_dict)
+    yield df
+
+
+@pytest.fixture
+def gen_data2():
+    rs = np.random.RandomState(0)
+    data_size = 100
+    data_dict = {
+        "a": rs.randint(0, 10, size=(data_size,)),
+        "b": rs.choice(list("abcd"), size=(data_size,)),
+        "c": rs.choice(list("abcd"), size=(data_size,)),
+        "d": rs.randint(0, 10, size=(data_size,)),
+    }
+    df = pd.DataFrame(data_dict)
+    yield df
+
+
+def test_groupby_nunique_without_index(setup, gen_data):
+    df = gen_data
+    mdf = md.DataFrame(df, chunk_size=13)
+    r1 = mdf.groupby("b", sort=False)[["a"]].nunique(method="tree").execute().fetch()
+    r2 = (
+        mdf.groupby("b", sort=False)[["a"]]
+        .nunique(method="shuffle")
+        .execute()
+        .fetch()
+        .sort_index(level=0)
+    )
+    r3 = (
+        mdf.groupby("b", sort=False)[["a"]]
+        .nunique(method="auto")
+        .execute()
+        .fetch()
+        .sort_index(level=0)
+    )
+
+    expected = df.groupby("b", sort=False)[["a"]].nunique()
+    pd.testing.assert_frame_equal(r1, expected)
+    pd.testing.assert_frame_equal(r2, expected.sort_index(level=0))
+    pd.testing.assert_frame_equal(r3, expected.sort_index(level=0))
+
+
+def test_groupby_nunique_with_index(setup, gen_data):
+    df = gen_data
+    mdf = md.DataFrame(df, chunk_size=13)
 
     r1 = (
         mdf.groupby("b", as_index=False, sort=False)["a"]
@@ -1470,7 +1514,7 @@ def test_groupby_nunique_with_index(setup):
         .reset_index(drop=True)
     )
 
-    expected = df1.groupby("b", as_index=False, sort=False)["a"].nunique()
+    expected = df.groupby("b", as_index=False, sort=False)["a"].nunique()
     pd.testing.assert_frame_equal(r1, expected)
     pd.testing.assert_frame_equal(
         r2, expected.sort_values(by="b").reset_index(drop=True)
@@ -1480,16 +1524,35 @@ def test_groupby_nunique_with_index(setup):
     )
 
 
-def test_groupby_nunique_frame(setup):
-    rs = np.random.RandomState(0)
-    data_size = 100
-    data_dict = {
-        "a": rs.randint(0, 10, size=(data_size,)),
-        "b": rs.choice(list("abcd"), size=(data_size,)),
-        "c": rs.choice(list("abcd"), size=(data_size,)),
-    }
-    df1 = pd.DataFrame(data_dict)
-    mdf = md.DataFrame(df1, chunk_size=13)
+def test_groupby_nunique_series(setup, gen_data):
+    # TODO
+    df = gen_data
+    mdf = md.DataFrame(df, chunk_size=13)
+    r1 = mdf.groupby("b", sort=False)["a"].nunique(method="tree").execute().fetch()
+    # r2 = (
+    #     mdf.groupby("b", sort=False)["a"]
+    #     .nunique(method="shuffle")
+    #     .execute()
+    #     .fetch()
+    #     .sort_index(level=0)
+    # )
+    r3 = (
+        mdf.groupby("b", sort=False)["a"]
+        .nunique(method="auto")
+        .execute()
+        .fetch()
+        .sort_index(level=0)
+    )
+
+    expected = df.groupby("b", sort=False)["a"].nunique()
+    pd.testing.assert_series_equal(r1, expected)
+    # pd.testing.assert_frame_equal(r2, expected.sort_index(level=0))
+    pd.testing.assert_series_equal(r3, expected.sort_index(level=0))
+
+
+def test_groupby_nunique_frame(setup, gen_data):
+    df = gen_data
+    mdf = md.DataFrame(df, chunk_size=13)
 
     r1 = mdf.groupby("b", sort=False)["a", "c"].nunique(method="tree").execute().fetch()
     r2 = (
@@ -1498,7 +1561,7 @@ def test_groupby_nunique_frame(setup):
         .execute()
         .fetch()
         .sort_values(by="b")
-        .reset_index(drop=True)
+        .reset_index()
     )
     r3 = (
         mdf.groupby("b", sort=False)["a", "c"]
@@ -1506,59 +1569,59 @@ def test_groupby_nunique_frame(setup):
         .execute()
         .fetch()
         .sort_values(by="b")
-        .reset_index(drop=True)
+        .reset_index()
     )
 
-    expected = df1.groupby("b", sort=False)["a", "c"].nunique()
+    expected = df.groupby("b", sort=False)["a", "c"].nunique()
     pd.testing.assert_frame_equal(r1, expected)
-    pd.testing.assert_frame_equal(
-        r2, expected.sort_values(by="b").reset_index(drop=True)
+    pd.testing.assert_frame_equal(r2, expected.sort_values(by="b").reset_index())
+    pd.testing.assert_frame_equal(r3, expected.sort_values(by="b").reset_index())
+
+
+def test_groupby_nunique_multiindex(setup, gen_data2):
+    df = gen_data2
+    mdf = md.DataFrame(df, chunk_size=13)
+
+    r1 = (
+        mdf.groupby(["b", "c"], sort=False)["a", "d"]
+        .nunique(method="tree")
+        .execute()
+        .fetch()
     )
-    pd.testing.assert_frame_equal(
-        r3, expected.sort_values(by="b").reset_index(drop=True)
+    r2 = (
+        mdf.groupby(["b", "c"], sort=False)["a", "d"]
+        .nunique(method="shuffle")
+        .execute()
+        .fetch()
+        .sort_values(by=["b", "c"])
+        .reset_index()
     )
-
-
-def test_groupby_nunique_multiindex(setup):
-    rs = np.random.RandomState(0)
-    data_size = 100
-    data_dict = {
-        "a": rs.randint(0, 10, size=(data_size,)),
-        "b": rs.choice(list("abcd"), size=(data_size,)),
-        "c": rs.choice(list("abcd"), size=(data_size,)),
-        "d": rs.choice(list("abcd"), size=(data_size,)),
-    }
-    df1 = pd.DataFrame(data_dict)
-    mdf = md.DataFrame(df1, chunk_size=13)
-
-    r1 = mdf.groupby(["b", "c"])["a", "d"].nunique(method="tree").execute().fetch()
-    # r2 = mdf.groupby(["b", "c"])[["a", "d"]].nunique(method='shuffle').execute().fetch()
     r3 = (
-        mdf.groupby(["b", "c"])["a", "d"]
+        mdf.groupby(["b", "c"], sort=False)["a", "d"]
         .nunique(method="auto")
         .execute()
         .fetch()
         .sort_values(by=["b", "c"])
-        .reset_index(drop=True)
+        .reset_index()
     )
 
-    expected = df1.groupby(["b", "c"])["a", "d"].nunique()
+    expected = df.groupby(["b", "c"], sort=False)["a", "d"].nunique()
     pd.testing.assert_frame_equal(r1, expected)
-    # pd.testing.assert_frame_equal(r2, expected)
-    pd.testing.assert_frame_equal(
-        r3, expected.sort_values(by=["b", "c"]).reset_index(drop=True)
-    )
+    pd.testing.assert_frame_equal(r2, expected.sort_values(by=["b", "c"]).reset_index())
+    pd.testing.assert_frame_equal(r3, expected.sort_values(by=["b", "c"]).reset_index())
 
 
-def test_groupby_nunique4(setup):
-    start = time.time()
-    df = md.read_parquet("/Users/lichengjie/Downloads/data-1G/lineitem.pq").execute()
-    t = time.time()
-    print(f"Read time: {t - start}")
-    res = (
-        df.loc[:, ["L_ORDERKEY", "L_SUPPKEY"]]
-        .groupby("L_ORDERKEY")["L_SUPPKEY"]
+def test_groupby_level(setup, gen_data):
+    # TODO
+    df = gen_data
+    mdf = md.DataFrame(df, chunk_size=13)
+
+    r = (
+        mdf.groupby(level=0, as_index=False, sort=False)["a"]
         .nunique()
+        .execute()
+        .fetch()
     )
-    print(res.execute())
-    print(f"Total time: {time.time() - t}")
+
+    expected = df.groupby(level=0, as_index=False, sort=False)["a"].nunique()
+    pd.testing.assert_frame_equal(r, expected)

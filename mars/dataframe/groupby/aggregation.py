@@ -20,7 +20,6 @@ from typing import Callable, Dict, List
 
 import numpy as np
 import pandas as pd
-from pandas import MultiIndex
 
 from ... import opcodes as OperandDef
 from ...config import options
@@ -1323,15 +1322,22 @@ class DataFrameGroupByAggNunique(DataFrameGroupByAgg):
             raise NotImplementedError
 
     @classmethod
-    def _get_selection_columns(cls, op: "DataFrameGroupByAggNunique"):
-        # todo
-        selection = op.groupby_params["selection"]
-        if isinstance(selection, (tuple, list)):
-            selection = [n for n in selection]
+    def _get_involved_columns(
+        cls, op: "DataFrameGroupByAggNunique", data: pd.DataFrame
+    ):
+        # todo hanlde groupby params dict
+        # todo handle groupby level
+        if "selection" in op.groupby_params:
+            selection = op.groupby_params["selection"]
+            if isinstance(selection, (tuple, list)):
+                selection = [n for n in selection]
+            else:
+                selection = [selection]
+            selection.extend(op.groupby_params["by"])
+
+            return selection
         else:
-            selection = [selection]
-        selection.extend(op.groupby_params["by"])
-        return selection
+            return data.columns
 
     @classmethod
     def _execute_map(cls, ctx, op: "DataFrameGroupByAggNunique"):
@@ -1343,7 +1349,7 @@ class DataFrameGroupByAggNunique(DataFrameGroupByAgg):
         ):
             in_data = cls._series_to_df(in_data, op.gpu)
 
-        cols = cls._get_selection_columns(op)
+        cols = cls._get_involved_columns(op, in_data)
 
         res = (
             in_data[cols]
@@ -1399,7 +1405,6 @@ class DataFrameGroupByAggNunique(DataFrameGroupByAgg):
             groupby_params["by"] = cols
             in_data = in_data.reset_index()
 
-        # res = in_data.drop_duplicates().groupby(**groupby_params).count()
         res = in_data.groupby(**groupby_params).nunique()
         ctx[out_chunk.key] = res
 
