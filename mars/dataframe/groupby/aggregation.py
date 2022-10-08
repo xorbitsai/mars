@@ -99,6 +99,7 @@ _agg_functions = {
     "skew": lambda x, bias=False: x.skew(bias=bias),
     "kurt": lambda x, bias=False: x.kurt(bias=bias),
     "kurtosis": lambda x, bias=False: x.kurtosis(bias=bias),
+    "nunique": lambda x: x.nunique()
 }
 _series_col_name = "col_name"
 
@@ -161,6 +162,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
     func = AnyField("func")
     func_rename = ListField("func_rename")
 
+    raw_groupby_params = DictField("raw_groupby_params")
     groupby_params = DictField("groupby_params")
 
     method = StringField("method")
@@ -1062,6 +1064,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
     @classmethod
     def _execute_map(cls, ctx, op: "DataFrameGroupByAgg"):
+        from .nunique import DataFrameGroupByAggNunique
         xdf = cudf if op.gpu else pd
 
         in_data = ctx[op.inputs[0].key]
@@ -1118,6 +1121,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
         agg_dfs = []
         for (
             input_key,
+            raw_func_name,
             map_func_name,
             _agg_func_name,
             custom_reduction,
@@ -1126,7 +1130,9 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             kwds,
         ) in op.agg_funcs:
             input_obj = ret_map_groupbys[input_key]
-            if map_func_name == "custom_reduction":
+            if raw_func_name == 'nunique':
+                agg_dfs.append(DataFrameGroupByAggNunique.get_execute_map_result(op, in_data))
+            elif map_func_name == "custom_reduction":
                 agg_dfs.extend(cls._do_custom_agg(op, custom_reduction, input_obj))
             else:
                 single_func = map_func_name == op.raw_func
@@ -1147,6 +1153,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
     @classmethod
     def _execute_combine(cls, ctx, op: "DataFrameGroupByAgg"):
+        from .nunique import DataFrameGroupByAggNunique
         xdf = cudf if op.gpu else pd
 
         in_data_tuple = ctx[op.inputs[0].key]
@@ -1162,17 +1169,20 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
         in_data_dict = cls._pack_inputs(op.agg_funcs, in_data_tuple)
 
         combines = []
-        for (
+        for raw_input, (
             _input_key,
+            raw_func_name,
             _map_func_name,
             agg_func_name,
             custom_reduction,
             output_key,
             _output_limit,
             kwds,
-        ) in op.agg_funcs:
+        ) in zip(ctx[op.inputs[0].key], op.agg_funcs):
             input_obj = in_data_dict[output_key]
-            if agg_func_name == "custom_reduction":
+            if raw_func_name == 'nunique':
+                combines.append(DataFrameGroupByAggNunique.get_execute_combine_result(op, raw_input))
+            elif agg_func_name == "custom_reduction":
                 combines.extend(cls._do_custom_agg(op, custom_reduction, *input_obj))
             else:
                 combines.append(
@@ -1182,6 +1192,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
     @classmethod
     def _execute_agg(cls, ctx, op: "DataFrameGroupByAgg"):
+        from .nunique import DataFrameGroupByAggNunique
         xdf = cudf if op.gpu else pd
         out_chunk = op.outputs[0]
         col_value = (
@@ -1204,6 +1215,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
         for (
             _input_key,
+            raw_func_name,
             _map_func_name,
             agg_func_name,
             custom_reduction,
@@ -1211,7 +1223,10 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             _output_limit,
             kwds,
         ) in op.agg_funcs:
-            if agg_func_name == "custom_reduction":
+            if raw_func_name == 'nunique':
+                res = DataFrameGroupByAggNunique.get_execute_agg_result(op, in_data_dict[output_key])
+                in_data_dict[output_key] = res
+            elif agg_func_name == "custom_reduction":
                 input_obj = tuple(
                     cls._get_grouped(op, o, ctx) for o in in_data_dict[output_key]
                 )
@@ -1226,21 +1241,24 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
         aggs = []
         for input_keys, _output_key, func_name, cols, func in op.post_funcs:
-            if cols is None:
-                func_inputs = [in_data_dict[k] for k in input_keys]
+            if func_name != 'nunique':
+                if cols is None:
+                    func_inputs = [in_data_dict[k] for k in input_keys]
+                else:
+                    func_inputs = [in_data_dict[k][cols] for k in input_keys]
+
+                if (
+                    func_inputs[0].ndim == 2
+                    and len(set(inp.shape[1] for inp in func_inputs)) > 1
+                ):
+                    common_cols = func_inputs[0].columns
+                    for inp in func_inputs[1:]:
+                        common_cols = common_cols.join(inp.columns, how="inner")
+                    func_inputs = [inp[common_cols] for inp in func_inputs]
+
+                agg_df = func(*func_inputs, gpu=op.is_gpu())
             else:
-                func_inputs = [in_data_dict[k][cols] for k in input_keys]
-
-            if (
-                func_inputs[0].ndim == 2
-                and len(set(inp.shape[1] for inp in func_inputs)) > 1
-            ):
-                common_cols = func_inputs[0].columns
-                for inp in func_inputs[1:]:
-                    common_cols = common_cols.join(inp.columns, how="inner")
-                func_inputs = [inp[common_cols] for inp in func_inputs]
-
-            agg_df = func(*func_inputs, gpu=op.is_gpu())
+                agg_df = in_data_dict[_output_key]
             if isinstance(agg_df, np.ndarray):
                 agg_df = xdf.DataFrame(agg_df, index=func_inputs[0].index)
 
@@ -1337,9 +1355,9 @@ def agg(groupby, func=None, method="auto", combine_size=None, *args, **kwargs):
         raise ValueError(
             f"Method {method} is not available, please specify 'tree' or 'shuffle"
         )
-    is_nunique_func: bool = type(func) is str and func == "nunique"
+    # is_nunique_func: bool = type(func) is str and func == "nunique"
 
-    if not is_nunique_func and not is_funcs_aggregate(func, ndim=groupby.ndim):
+    if not is_funcs_aggregate(func, ndim=groupby.ndim):
         # pass index to transform, otherwise it will lose name info for index
         agg_result = build_mock_agg_result(
             groupby, groupby.op.groupby_params, func, **kwargs
@@ -1359,25 +1377,26 @@ def agg(groupby, func=None, method="auto", combine_size=None, *args, **kwargs):
 
     use_inf_as_na = kwargs.pop("_use_inf_as_na", options.dataframe.mode.use_inf_as_na)
 
-    if is_nunique_func:
-        agg_op = DataFrameGroupByAggNunique(
-            raw_func=func,
-            raw_func_kw=kwargs,
-            method=method,
-            raw_groupby_params=groupby.op.groupby_params,
-            groupby_params=groupby.op.groupby_params,
-            combine_size=combine_size or options.combine_size,
-            chunk_store_limit=options.chunk_store_limit,
-            use_inf_as_na=use_inf_as_na,
-        )
-    else:
-        agg_op = DataFrameGroupByAgg(
-            raw_func=func,
-            raw_func_kw=kwargs,
-            method=method,
-            groupby_params=groupby.op.groupby_params,
-            combine_size=combine_size or options.combine_size,
-            chunk_store_limit=options.chunk_store_limit,
-            use_inf_as_na=use_inf_as_na,
-        )
+    # if is_nunique_func:
+    #     agg_op = DataFrameGroupByAggNunique(
+    #         raw_func=func,
+    #         raw_func_kw=kwargs,
+    #         method=method,
+    #         raw_groupby_params=groupby.op.groupby_params,
+    #         groupby_params=groupby.op.groupby_params,
+    #         combine_size=combine_size or options.combine_size,
+    #         chunk_store_limit=options.chunk_store_limit,
+    #         use_inf_as_na=use_inf_as_na,
+    #     )
+    # else:
+    agg_op = DataFrameGroupByAgg(
+        raw_func=func,
+        raw_func_kw=kwargs,
+        method=method,
+        raw_groupby_params=groupby.op.groupby_params,
+        groupby_params=groupby.op.groupby_params,
+        combine_size=combine_size or options.combine_size,
+        chunk_store_limit=options.chunk_store_limit,
+        use_inf_as_na=use_inf_as_na,
+    )
     return agg_op(groupby)

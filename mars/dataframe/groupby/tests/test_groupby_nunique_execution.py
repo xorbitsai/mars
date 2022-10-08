@@ -294,14 +294,14 @@ def test_groupby_agg_nunique(setup, gen_data1):
     expected = df.groupby(["b", "c"], as_index=False, sort=False).agg("nunique")
     pd.testing.assert_frame_equal(r, expected)
 
-    # r = mdf.groupby(['b', 'c']).agg(['nunique', 'sum']).execute().fetch()
-    # expected = df.groupby(['b', 'c']).agg(['nunique', 'sum'])
-    # pd.testing.assert_frame_equal(r, expected)
+    r = mdf.groupby(['b', 'c']).agg(['nunique', 'sum']).execute().fetch()
+    expected = df.groupby(['b', 'c']).agg(['nunique', 'sum'])
+    pd.testing.assert_frame_equal(r, expected)
 
-    # r = mdf.groupby(['b', 'c'], sort=False).agg(['nunique', 'sum']).execute().fetch()
-    # expected = df.groupby(['b', 'c'], sort=False).agg(['nunique', 'sum'])
-    # pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
+    r = mdf.groupby(['b', 'c'], sort=False).agg(['nunique', 'sum']).execute().fetch()
+    expected = df.groupby(['b', 'c'], sort=False).agg(['nunique', 'sum'])
+    pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
 
-    # r = mdf.groupby(['b', 'c'], as_index=False).agg(['nunique', 'sum']).execute().fetch()
-    # expected = df.groupby(['b', 'c'], as_index=False).agg(['nunique', 'sum'])
-    # pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
+    r = mdf.groupby(['b', 'c'], as_index=False).agg(['nunique', 'sum']).execute().fetch()
+    expected = df.groupby(['b', 'c'], as_index=False).agg(['nunique', 'sum'])
+    pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
