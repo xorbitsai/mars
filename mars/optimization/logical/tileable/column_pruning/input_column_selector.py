@@ -77,14 +77,13 @@ class InputColumnSelector:
         """
         Get the column pruning results of given tileable data.
 
-        If the argument 'additional' is passed, then it is appended after the main info.
-
         Parameters
         ----------
         tileable_data : TileableData
             The tileable data to be processed.
         required_cols: List[Any]
-            Names of columns required by the successors of the given tileable data. TODO docstring
+            Names of columns required by the successors of the given tileable data. If required_cols is None, all the
+            input columns will be selected.
         Returns
         -------
         Dict[TileableData: List[Any]]

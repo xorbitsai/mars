@@ -16,6 +16,7 @@ from typing import List
 
 import pandas as pd
 
+from .input_column_selector import InputColumnSelector
 from ..core import register_tileable_optimization_rule
 from ...core import (
     OptimizationRecord,
@@ -34,8 +35,6 @@ from .....dataframe.indexing.getitem import DataFrameIndex
 from .....dataframe.merge import DataFrameMerge
 from .....typing import OperandType, EntityType
 from .....utils import implements
-from .input_column_selector import InputColumnSelector
-
 
 OPTIMIZABLE_OP_TYPES = (DataFrameMerge, DataFrameGroupByAgg)
 
@@ -59,9 +58,10 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
     @staticmethod
     def _get_all_columns(entity: EntityType):
         """
-        TODO docstrings
+        Return all the columns of given entity. If the given entity is neither BaseDataFrameData nor BaseSeriesData,
+        None will be returned.
         """
-        if getattr(entity, "dtypes", None) is not None:
+        if isinstance(entity, BaseDataFrameData):
             return set(entity.dtypes.index)
         elif isinstance(entity, BaseSeriesData):
             return {entity.name}

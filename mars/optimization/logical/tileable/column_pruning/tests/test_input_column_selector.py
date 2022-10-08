@@ -16,15 +16,14 @@ from typing import Dict, Any, Set, List, Union
 
 import pytest
 
+from ..input_column_selector import InputColumnSelector
 from ......core import TileableData, ENTITY_TYPE
 from ......core.operand import Operand
 from ......dataframe import DataFrame, Series
 from ......tensor import tensor
-from ..input_column_selector import InputColumnSelector
 
 
 class MockOperand(Operand):
-
     _mock_input: TileableData = DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6)}).data
 
     @property
@@ -188,8 +187,37 @@ def test_df_merge_on_index():
 
 
 def test_df_arithmatic_ops():
-    # TODO implement
-    pass
+    def add(x, y):
+        return x + y
+
+    def sub(x, y):
+        return x - y
+
+    def mul(x, y):
+        return x * y
+
+    def div(x, y):
+        return x / y
+
+    ops = (add, sub, mul, div)
+    df1: DataFrame = DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6)})
+    df2: DataFrame = DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6)})
+
+    for op in ops:
+        res: DataFrame = op(df1, 1)
+        input_columns = InputColumnSelector.select_input_columns(res.data, {"foo"})
+        assert len(input_columns) == 1
+        assert res.data.inputs[0] in input_columns
+        assert input_columns[res.data.inputs[0]] == {"foo"}
+
+    for op in ops:
+        res: DataFrame = op(df1, df2)
+        input_columns = InputColumnSelector.select_input_columns(res.data, {"foo"})
+        assert len(input_columns) == 2
+        assert res.data.inputs[0] in input_columns
+        assert input_columns[res.data.inputs[0]] == {"foo"}
+        assert res.data.inputs[1] in input_columns
+        assert input_columns[res.data.inputs[1]] == {"foo"}
 
 
 def test_df_setitem():
