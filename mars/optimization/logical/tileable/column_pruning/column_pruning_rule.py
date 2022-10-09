@@ -61,7 +61,7 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
         Return all the columns of given entity. If the given entity is neither BaseDataFrameData nor BaseSeriesData,
         None will be returned.
         """
-        if isinstance(entity, BaseDataFrameData):
+        if isinstance(entity, BaseDataFrameData) and entity.dtypes is not None:
             return set(entity.dtypes.index)
         elif isinstance(entity, BaseSeriesData):
             return {entity.name}
