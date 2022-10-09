@@ -167,6 +167,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
     method = StringField("method")
     use_inf_as_na = BoolField("use_inf_as_na")
+    optimized_funcs = ("nunique",)
 
     # for chunk
     combine_size = Int32Field("combine_size")
@@ -1127,7 +1128,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             kwds,
         ) in op.agg_funcs:
             input_obj = ret_map_groupbys[input_key]
-            if raw_func_name == "nunique":
+            if raw_func_name in cls.optimized_funcs:
                 agg_dfs.append(
                     DataFrameGroupByAggNunique.get_execute_map_result(op, in_data)
                 )
@@ -1180,7 +1181,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             kwds,
         ) in zip(ctx[op.inputs[0].key], op.agg_funcs):
             input_obj = in_data_dict[output_key]
-            if raw_func_name == "nunique":
+            if raw_func_name in cls.optimized_funcs:
                 combines.append(
                     DataFrameGroupByAggNunique.get_execute_combine_result(op, raw_input)
                 )
@@ -1226,7 +1227,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             _output_limit,
             kwds,
         ) in op.agg_funcs:
-            if raw_func_name == "nunique":
+            if raw_func_name in cls.optimized_funcs:
                 res = DataFrameGroupByAggNunique.get_execute_agg_result(
                     op, in_data_dict[output_key]
                 )
@@ -1246,7 +1247,9 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
         aggs = []
         for input_keys, _output_key, func_name, cols, func in op.post_funcs:
-            if func_name != "nunique":
+            if func_name in cls.optimized_funcs:
+                agg_df = in_data_dict[_output_key]
+            else:
                 if cols is None:
                     func_inputs = [in_data_dict[k] for k in input_keys]
                 else:
@@ -1262,8 +1265,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
                     func_inputs = [inp[common_cols] for inp in func_inputs]
 
                 agg_df = func(*func_inputs, gpu=op.is_gpu())
-            else:
-                agg_df = in_data_dict[_output_key]
             if isinstance(agg_df, np.ndarray):
                 agg_df = xdf.DataFrame(agg_df, index=func_inputs[0].index)
 
