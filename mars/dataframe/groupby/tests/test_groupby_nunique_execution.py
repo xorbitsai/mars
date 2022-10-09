@@ -272,6 +272,23 @@ def test_groupby_nunique_level(setup, gen_data1, gen_data3):
     expected = df2.groupby(level=(0, 1), sort=False).nunique()
     pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
 
+    r = mdf2.groupby(level=["Type", "Animal"]).nunique(method="tree").execute().fetch()
+    expected = df2.groupby(level=["Type", "Animal"]).nunique()
+    pd.testing.assert_frame_equal(r, expected)
+
+    r = mdf2.groupby(level=["Type", "Animal"]).nunique(method="auto").execute().fetch()
+    expected = df2.groupby(level=["Type", "Animal"]).nunique()
+    pd.testing.assert_frame_equal(r, expected)
+
+    r = (
+        mdf2.groupby(level=["Type", "Animal"], sort=False)
+        .nunique(method="shuffle")
+        .execute()
+        .fetch()
+    )
+    expected = df2.groupby(level=["Type", "Animal"]).nunique()
+    pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
+
 
 def test_groupby_agg_nunique(setup, gen_data1):
     df = gen_data1
@@ -279,6 +296,18 @@ def test_groupby_agg_nunique(setup, gen_data1):
 
     r = mdf.groupby(["b", "c"]).agg("nunique").execute().fetch()
     expected = df.groupby(["b", "c"]).agg("nunique")
+    pd.testing.assert_frame_equal(r, expected)
+
+    r = mdf.groupby(["b", "c"]).agg(["nunique"], method="tree").execute().fetch()
+    expected = df.groupby(["b", "c"]).agg(["nunique"])
+    pd.testing.assert_frame_equal(r, expected)
+
+    r = mdf.groupby(["b", "c"]).agg(["nunique"], method="auto").execute().fetch()
+    expected = df.groupby(["b", "c"]).agg(["nunique"])
+    pd.testing.assert_frame_equal(r, expected)
+
+    r = mdf.groupby(["b", "c"]).agg(["nunique"], method="shuffle").execute().fetch()
+    expected = df.groupby(["b", "c"]).agg(["nunique"])
     pd.testing.assert_frame_equal(r, expected)
 
     r = mdf.groupby(["b", "c"], as_index=False).agg("nunique").execute().fetch()
@@ -294,14 +323,35 @@ def test_groupby_agg_nunique(setup, gen_data1):
     expected = df.groupby(["b", "c"], as_index=False, sort=False).agg("nunique")
     pd.testing.assert_frame_equal(r, expected)
 
-    r = mdf.groupby(['b', 'c']).agg(['nunique', 'sum']).execute().fetch()
-    expected = df.groupby(['b', 'c']).agg(['nunique', 'sum'])
+    r = (
+        mdf.groupby(["b", "c"], as_index=False, sort=False)
+        .agg("nunique", method="shuffle")
+        .execute()
+        .fetch()
+    )
+    expected = df.groupby(["b", "c"], as_index=False, sort=False).agg("nunique")
+    pd.testing.assert_frame_equal(
+        r.sort_values(by=["b", "c"]).reset_index(drop=True),
+        expected.sort_values(by=["b", "c"]).reset_index(drop=True),
+    )
+
+    r = mdf.groupby(["b", "c"]).agg(["nunique", "sum"]).execute().fetch()
+    expected = df.groupby(["b", "c"]).agg(["nunique", "sum"])
     pd.testing.assert_frame_equal(r, expected)
 
-    r = mdf.groupby(['b', 'c'], sort=False).agg(['nunique', 'sum']).execute().fetch()
-    expected = df.groupby(['b', 'c'], sort=False).agg(['nunique', 'sum'])
+    r = mdf.groupby(["b", "c"]).agg(["sum", "nunique", "mean"]).execute().fetch()
+    expected = df.groupby(["b", "c"]).agg(["sum", "nunique", "mean"])
+    pd.testing.assert_frame_equal(r, expected)
+
+    r = mdf.groupby(["b", "c"], sort=False).agg(["nunique", "sum"]).execute().fetch()
+    expected = df.groupby(["b", "c"], sort=False).agg(["nunique", "sum"])
     pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
 
-    r = mdf.groupby(['b', 'c'], as_index=False).agg(['nunique', 'sum']).execute().fetch()
-    expected = df.groupby(['b', 'c'], as_index=False).agg(['nunique', 'sum'])
+    r = (
+        mdf.groupby(["b", "c"], as_index=False)
+        .agg(["nunique", "sum"])
+        .execute()
+        .fetch()
+    )
+    expected = df.groupby(["b", "c"], as_index=False).agg(["nunique", "sum"])
     pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
