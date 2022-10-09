@@ -25,6 +25,19 @@ class DataFrameGroupByAggNunique:
     def _get_level_indexes(
         cls, op: "DataFrameGroupByAgg", data: pd.DataFrame
     ) -> List[int]:
+        """
+        When group by level, get the level index list.
+        Level can be int, level name, or sequence of such.
+        This function calculates the corresponding indexes.
+        Parameters
+        ----------
+        op
+        data
+
+        Returns
+        -------
+
+        """
         index_names = [data.index.name] if data.index.name else data.index.names
         indexes = np.array([i for i in range(len(index_names))])
 
@@ -46,6 +59,17 @@ class DataFrameGroupByAggNunique:
     def _get_selection_columns(
         cls, op: "DataFrameGroupByAgg"
     ) -> Union[None, List[str]]:
+        """
+        Get groupby selection columns from op parameters.
+        If this returns None, it means all columns are required.
+        Parameters
+        ----------
+        op
+
+        Returns
+        -------
+
+        """
         if "selection" in op.groupby_params:
             selection = op.groupby_params["selection"]
             if isinstance(selection, (tuple, list)):
@@ -74,6 +98,7 @@ class DataFrameGroupByAggNunique:
             cols = [*index_names, *selections]
             res = in_data[cols].drop_duplicates().set_index(index_names)
 
+        # if sort=True is specified， sort index when finishing drop_duplicates.
         if op.raw_groupby_params["sort"]:
             res = res.sort_index()
 
@@ -107,6 +132,8 @@ class DataFrameGroupByAggNunique:
                 groupby_params["by"] = cols
                 in_data = in_data.reset_index()
         else:
+            # When group by multi levels, we must get the actual all levels from raw_groupby_params,
+            # since level field in op.groupby_params is not correct.
             groupby_params["level"] = op.raw_groupby_params["level"]
 
         res = in_data.groupby(**groupby_params).nunique()

@@ -121,18 +121,12 @@ def test_groupby_nunique_with_index(setup, gen_data1):
 
 
 def test_groupby_nunique_series(setup, gen_data1):
-    # TODO
     df = gen_data1
     mdf = md.DataFrame(df, chunk_size=13)
+    # When method = shuffle and output is series, mars has issue about that.
+    # Therefore, skip the case.
     r1 = mdf.groupby("b", sort=False)["a"].nunique(method="tree").execute().fetch()
-    # r2 = (
-    #     mdf.groupby("b", sort=False)["a"]
-    #     .sum(method="shuffle")
-    #     .execute()
-    #     .fetch()
-    #     .sort_index(level=0)
-    # )
-    r3 = (
+    r2 = (
         mdf.groupby("b", sort=False)["a"]
         .nunique(method="auto")
         .execute()
@@ -142,8 +136,7 @@ def test_groupby_nunique_series(setup, gen_data1):
 
     expected = df.groupby("b", sort=False)["a"].nunique()
     pd.testing.assert_series_equal(r1, expected)
-    # pd.testing.assert_frame_equal(r2, expected.sort_index(level=0))
-    pd.testing.assert_series_equal(r3, expected.sort_index(level=0))
+    pd.testing.assert_series_equal(r2, expected.sort_index(level=0))
 
 
 def test_groupby_nunique_frame(setup, gen_data1):
