@@ -16,7 +16,6 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 
-from .aggregation import DataFrameGroupByAgg
 from ...core import OutputType
 
 
@@ -43,13 +42,13 @@ class DataFrameGroupByAggNunique:
 
         index_names = np.array(index_names)
         level = op.groupby_params["level"]
-        if type(level) is int:
+        if isinstance(level, int):
             indexes = [indexes[level]]
-        elif type(level) is str:
+        elif isinstance(level, str):
             indexes = np.argwhere(np.isin(index_names, level)).ravel().tolist()
         else:
             level = list(level)
-            if type(level[0]) is int:
+            if isinstance(level[0], int):
                 indexes = indexes[level].tolist()
             else:
                 indexes = np.argwhere(np.isin(index_names, level)).ravel().tolist()
