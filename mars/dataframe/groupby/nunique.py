@@ -16,13 +16,14 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 
+from .aggregation import DataFrameGroupByAgg
 from ...core import OutputType
 
 
 class DataFrameGroupByAggNunique:
     @classmethod
     def _get_level_indexes(
-        cls, op: "DataFrameGroupByAgg", data: pd.DataFrame
+        cls, op: DataFrameGroupByAgg, data: pd.DataFrame
     ) -> List[int]:
         """
         When group by level, get the level index list.
@@ -55,9 +56,7 @@ class DataFrameGroupByAggNunique:
         return indexes
 
     @classmethod
-    def _get_selection_columns(
-        cls, op: "DataFrameGroupByAgg"
-    ) -> Union[None, List[str]]:
+    def _get_selection_columns(cls, op: DataFrameGroupByAgg) -> Union[None, List[str]]:
         """
         Get groupby selection columns from op parameters.
         If this returns None, it means all columns are required.
@@ -80,7 +79,7 @@ class DataFrameGroupByAggNunique:
 
     @classmethod
     def get_execute_map_result(
-        cls, op: "DataFrameGroupByAgg", in_data: pd.DataFrame
+        cls, op: DataFrameGroupByAgg, in_data: pd.DataFrame
     ) -> Union[pd.DataFrame, pd.Series]:
         selections = cls._get_selection_columns(op)
         by_cols = op.raw_groupby_params["by"]
@@ -108,7 +107,7 @@ class DataFrameGroupByAggNunique:
 
     @classmethod
     def get_execute_combine_result(
-        cls, op: "DataFrameGroupByAgg", in_data: pd.DataFrame
+        cls, op: DataFrameGroupByAgg, in_data: pd.DataFrame
     ) -> Union[pd.DataFrame, pd.Series]:
         # in_data.index.names means MultiIndex (groupby on multi cols)
         index_col = in_data.index.name or in_data.index.names
@@ -119,7 +118,7 @@ class DataFrameGroupByAggNunique:
 
     @classmethod
     def get_execute_agg_result(
-        cls, op: "DataFrameGroupByAgg", in_data: pd.DataFrame
+        cls, op: DataFrameGroupByAgg, in_data: pd.DataFrame
     ) -> Union[pd.DataFrame, pd.Series]:
         groupby_params = op.groupby_params.copy()
         cols = in_data.index.name or in_data.index.names
