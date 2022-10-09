@@ -913,7 +913,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             in_df = build_concatenated_rows_frame(in_df)
         out_df = op.outputs[0]
 
-        func_infos = cls._get_func_infos(op, in_df)
+        func_infos = cls._compile_funcs(op, in_df)
 
         if op.method == "auto":
             logger.debug("Choose auto method for groupby operand %s", op)
@@ -929,10 +929,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             return cls._tile_with_tree(op, in_df, out_df, func_infos)
         else:  # pragma: no cover
             raise NotImplementedError
-
-    @classmethod
-    def _get_func_infos(cls, op: "DataFrameGroupByAgg", df) -> ReductionSteps:
-        return cls._compile_funcs(op, df)
 
     @classmethod
     def _get_grouped(cls, op: "DataFrameGroupByAgg", df, ctx, copy=False, grouper=None):
