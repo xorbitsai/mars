@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
+from typing import List, Dict, Set, Any, Type, Union
 
 import pandas as pd
 
@@ -22,7 +22,11 @@ from ...core import (
     OptimizationRecord,
     OptimizationRecordType,
     OptimizationRule,
+    OptimizationRecords,
+    Optimizer,
 )
+from .....core import TileableData
+from .....core.graph import EntityGraph
 from .....dataframe.core import (
     parse_index,
     BaseSeriesData,
@@ -32,7 +36,6 @@ from .....dataframe.datasource.core import ColumnPruneSupportedDataSourceMixin
 from .....dataframe.groupby.aggregation import DataFrameGroupByAgg
 from .....dataframe.indexing.getitem import DataFrameIndex
 from .....dataframe.merge import DataFrameMerge
-from .....typing import EntityType
 from .....utils import implements
 
 OPTIMIZABLE_OP_TYPES = (DataFrameMerge, DataFrameGroupByAgg)
@@ -40,78 +43,88 @@ OPTIMIZABLE_OP_TYPES = (DataFrameMerge, DataFrameGroupByAgg)
 
 @register_optimization_rule()
 class ColumnPruningRule(OptimizationRule):
-    context = {}
+    def __init__(
+        self,
+        graph: EntityGraph,
+        records: OptimizationRecords,
+        optimizer_cls: Type["Optimizer"],
+    ):
+        super().__init__(graph, records, optimizer_cls)
+        self._context: Dict[TileableData, Dict[TileableData, Set[Any]]] = {}
 
-    def _get_selected_columns(self, entity: EntityType):
+    def _get_selected_columns(self, data: TileableData) -> Set[Any]:
         """
         Get pruned columns of the given entity.
         """
-        successors = self._get_successors(entity)
+        successors = self._get_successors(data)
         if successors:
             return set().union(
-                *[self.context[successor][entity] for successor in successors]
+                *[self._context[successor][data] for successor in successors]
             )
         else:
-            return self._get_all_columns(entity)
+            return self._get_all_columns(data)
 
     @staticmethod
-    def _get_all_columns(entity: EntityType):
+    def _get_all_columns(data: TileableData) -> Union[Set[Any], None]:
         """
-        Return all the columns of given entity. If the given entity is neither BaseDataFrameData nor BaseSeriesData,
-        None will be returned.
+        Return all the columns of given tileable data. If the given tileable data is neither BaseDataFrameData nor
+        BaseSeriesData, None will be returned, indicating that column pruning is not available for the given tileable
+        data.
         """
-        if isinstance(entity, BaseDataFrameData) and entity.dtypes is not None:
-            return set(entity.dtypes.index)
-        elif isinstance(entity, BaseSeriesData):
-            return {entity.name}
+        if isinstance(data, BaseDataFrameData) and data.dtypes is not None:
+            return set(data.dtypes.index)
+        elif isinstance(data, BaseSeriesData):
+            return {data.name}
         else:
             return None
 
-    def _get_successors(self, entity: EntityType):
+    def _get_successors(self, data: TileableData) -> List[TileableData]:
         """
-        Get successors of the given entity.
+        Get successors of the given tileable data.
 
         Column pruning is available only when every successor is available for column pruning (i.e. appears in the
         context).
         """
-        successors = list(self._graph.successors(entity))
-        if all(successor in self.context for successor in successors):
+        successors = list(self._graph.successors(data))
+        if all(successor in self._context for successor in successors):
             return successors
         else:
             return []
 
-    def _select_columns(self):
+    def _select_columns(self) -> None:
         """
-        Select required columns for each entity in the graph.
+        Select required columns for each tileable data in the graph.
         """
-        for entity in self._graph.topological_iter(reverse=True):
-            if self._is_skipped_type(entity):
+        for data in self._graph.topological_iter(reverse=True):
+            if self._is_skipped_type(data):
                 continue
-            self.context[entity] = InputColumnSelector.select_input_columns(
-                entity, self._get_selected_columns(entity)
+            self._context[data] = InputColumnSelector.select_input_columns(
+                data, self._get_selected_columns(data)
             )
 
-    def _insert_getitem_nodes(self):
-        pruned_nodes = []
-        datasource_nodes = []
+    def _insert_getitem_nodes(self) -> List[TileableData]:
+        pruned_nodes: List[TileableData] = []
+        datasource_nodes: List[TileableData] = []
+
         node_list = list(self._graph.topological_iter())
-        for entity in node_list:
-            if self._is_skipped_type(entity):
+        for data in node_list:
+            if self._is_skipped_type(data):
                 continue
 
-            op = entity.op
-            selected_columns = self._get_selected_columns(entity)
+            op = data.op
+            selected_columns = self._get_selected_columns(data)
+
             if isinstance(op, ColumnPruneSupportedDataSourceMixin) and set(
                 selected_columns
-            ) != self._get_all_columns(entity):
+            ) != self._get_all_columns(data):
                 op.set_pruned_columns(list(selected_columns))
                 self.effective = True
-                pruned_nodes.append(entity)
-                datasource_nodes.append(entity)
+                pruned_nodes.append(data)
+                datasource_nodes.append(data)
                 continue
 
             if isinstance(op, OPTIMIZABLE_OP_TYPES):
-                predecessors = list(self._graph.predecessors(entity))
+                predecessors = list(self._graph.predecessors(data))
                 for predecessor in predecessors:
                     if (
                         self._is_skipped_type(predecessor)
@@ -121,7 +134,7 @@ class ColumnPruningRule(OptimizationRule):
                     ):
                         continue
 
-                    pruned_columns = list(self.context[entity][predecessor])
+                    pruned_columns = list(self._context[data][predecessor])
                     if set(pruned_columns) == self._get_all_columns(predecessor):
                         continue
 
@@ -143,15 +156,15 @@ class ColumnPruningRule(OptimizationRule):
                     ).data
 
                     # update context
-                    del self.context[entity][predecessor]
-                    self.context[new_node] = {predecessor: pruned_columns}
-                    self.context[entity][new_node] = pruned_columns
+                    del self._context[data][predecessor]
+                    self._context[new_node] = {predecessor: set(pruned_columns)}
+                    self._context[data][new_node] = set(pruned_columns)
 
                     # change edges and nodes
-                    self._graph.remove_edge(predecessor, entity)
+                    self._graph.remove_edge(predecessor, data)
                     self._graph.add_node(new_node)
                     self._graph.add_edge(predecessor, new_node)
-                    self._graph.add_edge(new_node, entity)
+                    self._graph.add_edge(new_node, data)
 
                     self._records.append_record(
                         OptimizationRecord(
@@ -159,12 +172,12 @@ class ColumnPruningRule(OptimizationRule):
                         )
                     )
                     # update inputs
-                    entity.inputs[entity.inputs.index(predecessor)] = new_node
+                    data.inputs[data.inputs.index(predecessor)] = new_node
                     self.effective = True
                     pruned_nodes.extend([predecessor])
         return pruned_nodes
 
-    def _update_tileable_params(self, pruned_nodes: List[EntityType]):
+    def _update_tileable_params(self, pruned_nodes: List[TileableData]) -> None:
         # change dtypes and columns_value
         queue = [n for n in pruned_nodes]
         affected_nodes = set()
@@ -202,15 +215,8 @@ class ColumnPruningRule(OptimizationRule):
         self._update_tileable_params(pruned_nodes)
 
     @staticmethod
-    def _is_skipped_type(entity: EntityType) -> bool:
+    def _is_skipped_type(data: TileableData) -> bool:
         """
-        If an entity is not a DataFrame or a Series, do not handle that.
-        Parameters
-        ----------
-        entity
-
-        Returns
-        -------
-
+        If column pruning should be applied to the given tileable data.
         """
-        return not isinstance(entity, (BaseSeriesData, BaseDataFrameData))
+        return not isinstance(data, (BaseSeriesData, BaseDataFrameData))

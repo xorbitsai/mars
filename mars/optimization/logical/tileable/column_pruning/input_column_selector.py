@@ -35,7 +35,7 @@ class InputColumnSelector:
 
     @staticmethod
     def select_all_input_columns(
-        tileable_data: TileableData, required_cols: Set[Any]
+        tileable_data: TileableData, _required_cols: Set[Any]
     ) -> Dict[TileableData, Set[Any]]:
         ret = {}
         for inp in tileable_data.op.inputs:
@@ -62,11 +62,11 @@ class InputColumnSelector:
         cls,
         op_cls: OperandType,
         func: Callable[[TileableData, Set[Any]], Dict[TileableData, Set[Any]]],
-    ):
+    ) -> None:
         cls._OP_TO_SELECT_FUNCTION[op_cls] = func
 
     @classmethod
-    def unregister(cls, op_cls: OperandType):
+    def unregister(cls, op_cls: OperandType) -> None:
         if op_cls in cls._OP_TO_SELECT_FUNCTION:
             del cls._OP_TO_SELECT_FUNCTION[op_cls]
 
@@ -104,7 +104,7 @@ class InputColumnSelector:
         return cls.select_all_input_columns(tileable_data, required_cols)
 
 
-def register_selector(op_type: OperandType):
+def register_selector(op_type: OperandType) -> Callable:
     def wrap(selector_func: Callable):
         InputColumnSelector.register(op_type, selector_func)
         return selector_func
@@ -144,7 +144,7 @@ def df_merge_select_function(
     return ret
 
 
-def _get_cols_exclude_index(inp: BaseDataFrameData, cols: Any) -> Set:
+def _get_cols_exclude_index(inp: BaseDataFrameData, cols: Any) -> Set[Any]:
     ret = set()
     if isinstance(cols, (list, tuple)):
         for col in cols:
@@ -171,9 +171,9 @@ def df_groupby_agg_select_function(
 
     ret = {}
     # group by a series
-    group_by_series = False
+    groupby_series = False
     if isinstance(by, list) and len(by) == 1 and isinstance(by[0], BaseSeriesData):
-        group_by_series = True
+        groupby_series = True
         ret[by[0]] = by[0].name
 
     if isinstance(inp, BaseSeriesData):
@@ -181,7 +181,7 @@ def df_groupby_agg_select_function(
     else:
         selected_cols = set()
         # group by keys should be included
-        if not group_by_series:
+        if not groupby_series:
             selected_cols.update(_get_cols_exclude_index(inp, by))
         # add agg columns
         if op.raw_func is not None:
