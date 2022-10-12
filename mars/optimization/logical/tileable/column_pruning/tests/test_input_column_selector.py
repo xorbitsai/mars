@@ -58,7 +58,7 @@ def test_register():
     }
 
 
-def test_df_group_by_agg():
+def test_df_groupby_agg():
     df: DataFrame = DataFrame(
         {
             "foo": (1, 1, 2, 2),
@@ -100,7 +100,7 @@ def test_df_group_by_agg():
 
 
 @pytest.mark.skip(reason="group by index is not supported yet")
-def test_df_group_by_index_agg():
+def test_df_groupby_index_agg():
     df: DataFrame = DataFrame({"foo": (1, 1, 3), "bar": (4, 5, 6)})
     df = df.set_index("foo")
     s = df.groupby(by="foo").sum()

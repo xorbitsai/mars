@@ -19,14 +19,20 @@ import pandas as pd
 import pytest
 
 from ...... import dataframe as md
+from ...... import tensor as mt
 from ......dataframe.arithmetic import DataFrameMul
-from ......dataframe.core import DataFrameData, SeriesData
+from ......dataframe.base.isin import DataFrameIsin
+from ......dataframe.core import DataFrameData, SeriesData, DataFrameGroupByData
+from ......dataframe.datasource.dataframe import DataFrameDataSource
 from ......dataframe.datasource.read_csv import DataFrameReadCSV
 from ......dataframe.datasource.read_parquet import DataFrameReadParquet
 from ......dataframe.groupby.aggregation import DataFrameGroupByAgg
+from ......dataframe.groupby.core import DataFrameGroupByOperand
 from ......dataframe.indexing.getitem import DataFrameIndex
 from ......dataframe.merge import DataFrameMerge
 from ......optimization.logical.tileable import optimize
+from ......tensor.core import TensorData
+from ......tensor.datasource import ArrayDataSource
 
 
 @pytest.fixture()
@@ -84,7 +90,65 @@ def gen_data2():
         yield file_path, file_path2
 
 
-def test_group_by(setup, gen_data1):
+def test_groupby(setup, gen_data2):
+    # no column pruning
+    file_path, file_path2 = gen_data2
+    df1 = md.read_parquet(file_path)
+    df2 = md.read_parquet(file_path2)
+    m = df1.merge(df2, left_on="c1", right_on="cc1")
+    g = m.groupby(["c1"])
+
+    graph = g.build_graph()
+    optimize(graph)
+
+    assert len(graph.result_tileables) == 1
+    groupby_data = graph.result_tileables[0]
+    assert isinstance(groupby_data, DataFrameGroupByData)
+    assert isinstance(groupby_data.op, DataFrameGroupByOperand)
+    assert len(groupby_data.dtypes) == 8
+
+    assert len(groupby_data.inputs) == 1
+    merge_data = groupby_data.inputs[0]
+    assert isinstance(merge_data, DataFrameData)
+    assert isinstance(merge_data.op, DataFrameMerge)
+    assert len(groupby_data.dtypes) == 8
+
+    assert len(merge_data.inputs) == 2
+    left_data = merge_data.inputs[0]
+    right_data = merge_data.inputs[1]
+    assert isinstance(left_data, DataFrameData)
+    assert isinstance(left_data.op, DataFrameReadParquet)
+    assert len(left_data.dtypes) == 4
+    assert isinstance(right_data, DataFrameData)
+    assert isinstance(right_data.op, DataFrameReadParquet)
+    assert len(right_data.dtypes) == 4
+
+
+def test_tensor(setup, gen_data1):
+    t = mt.tensor((1, 2, 3))
+    s = md.DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6)}).isin(t)
+
+    graph = s.build_graph()
+    optimize(graph)
+
+    assert len(graph.result_tileables) == 1
+    isin_data = graph.result_tileables[0]
+    assert isinstance(isin_data, DataFrameData)
+    assert isinstance(isin_data.op, DataFrameIsin)
+    assert len(isin_data.dtypes) == 2
+
+    assert len(isin_data.inputs) == 2
+    df_data = isin_data.inputs[0]
+    assert isinstance(df_data, DataFrameData)
+    assert isinstance(df_data.op, DataFrameDataSource)
+    assert len(df_data.dtypes) == 2
+
+    tensor_data = isin_data.inputs[1]
+    assert isinstance(tensor_data, TensorData)
+    assert isinstance(tensor_data.op, ArrayDataSource)
+
+
+def test_groupby_agg(setup, gen_data1):
     file_path, _ = gen_data1
 
     df1 = md.read_csv(file_path)
@@ -177,7 +241,7 @@ def test_merge_on_two_columns(setup, gen_data1):
     pd.testing.assert_frame_equal(r, expected)
 
 
-def test_group_by_then_merge(setup, gen_data1):
+def test_groupby_agg_then_merge(setup, gen_data1):
     file_path, file_path2 = gen_data1
     df1 = md.read_csv(file_path)
     df2 = md.read_csv(file_path2)
@@ -211,7 +275,7 @@ def test_group_by_then_merge(setup, gen_data1):
     assert set(df1_node.op.usecols) == {"c1", "c2"}
 
 
-def test_merge_then_group_by(setup, gen_data2):
+def test_merge_then_groupby_apply(setup, gen_data2):
 
     file_path, file_path2 = gen_data2
     df1 = md.read_parquet(file_path)
@@ -312,7 +376,7 @@ def test_two_merges(setup, gen_data2):
     assert set(index_after_merge_node.op.col_names) == {"c2", "c4", "cc1", "cc2"}
 
 
-def test_two_groupbys_with_multi_index(setup, gen_data2):
+def test_two_groupby_aggs_with_multi_index(setup, gen_data2):
     file_path, _ = gen_data2
     df = md.read_parquet(file_path)
     c = (
