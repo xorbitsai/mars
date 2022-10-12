@@ -325,7 +325,7 @@ cdef list tokenize_pandas_tick(ob):
     return iterative_tokenize([ob.freqstr])
 
 
-cdef list tokenize_pandas_interval_arrays(ob):
+cdef list tokenize_pandas_interval_arrays(ob):  # pragma: no cover
     if _has_interval_array_inclusive:
         return iterative_tokenize([ob.left, ob.right, ob.inclusive])
     else:
