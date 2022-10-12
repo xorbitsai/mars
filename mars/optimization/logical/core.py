@@ -17,11 +17,11 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type, Set
 
 from ...core import OperandType, EntityType, enter_mode
 from ...core.graph import EntityGraph
-from ...core.operand import Operand
+from ...utils import implements
 
 
 class OptimizationRecordType(Enum):
@@ -109,31 +109,16 @@ class OptimizationRule(ABC):
         )
 
     @abstractmethod
-    def match(self, op: OperandType) -> bool:
+    def apply(self) -> bool:
         """
-        If this operand matches this rule.
-
-        Parameters
-        ----------
-        op : OperandType
-            Operand.
+        Apply the rule to the graph.
 
         Returns
         -------
-        matched : bool
-            Matched rule or not.
+        bool
+            If the graph got optimized.
         """
-
-    @abstractmethod
-    def apply(self, op: OperandType):
-        """
-        Apply rule to an operand.
-
-        Parameters
-        ----------
-        op : OperandType
-            Operand
-        """
+        pass
 
     def _replace_node(self, original_node: EntityType, new_node: EntityType):
         predecessors = self._graph.predecessors(original_node)
@@ -175,63 +160,80 @@ class OptimizationRule(ABC):
             )
 
 
-class CommonGraphOptimizationRule(OptimizationRule):
+class OperandBasedOptimizationRule(OptimizationRule):
+    """
+    Optimization rule that optimize certain operands of the graph in topological way.
+    """
 
-    effective: bool = False
+    _rule_type_to_op_types: Dict[
+        Type[OptimizationRule], Set[Type[OperandType]]
+    ] = defaultdict(set)
 
-    def match(self, op: OperandType) -> bool:
-        return False
+    @implements(OptimizationRule.apply)
+    def apply(self) -> bool:
+        visited = set()
+        optimized = False
+        for entity in list(self._graph.topological_iter()):
+            op = entity.op
+            if op in visited:
+                continue
+            visited.add(op)
 
-    def apply(self, op: OperandType):
+            if entity not in self._graph:  # pragma: no cover
+                # maybe removed during optimization
+                continue
+            op_types = self._rule_type_to_op_types[type(self)]
+            if isinstance(op, tuple(op_types)) and self.match_operand(op):
+                optimized = True
+                self.apply_to_operand(op)
+
+        return optimized
+
+    @abstractmethod
+    def apply_to_operand(self, op: OperandType) -> None:
         """
-        Apply rule to an operand.
+        Apply this rule to the given operand.
 
         Parameters
         ----------
         op : OperandType
-            Operand
+            Operand.
         """
         pass
 
+    @abstractmethod
+    def match_operand(self, op: OperandType) -> bool:
+        """
+        If this operand matches this rule.
+
+        Parameters
+        ----------
+        op : OperandType
+            Operand.
+
+        Returns
+        -------
+        bool
+            If this operand matches this rule.
+        """
+        pass
+
+    @classmethod
+    def register_operand(cls, op_type: Type[OperandType]):
+        cls._rule_type_to_op_types[cls].add(op_type)
+        for derived in op_type.__subclasses__():
+            cls._rule_type_to_op_types[cls].add(derived)
+
 
 class Optimizer(ABC):
-    _rules: List[Type[OptimizationRule]]
-    _op_to_rules: Dict[Type[OperandType], List[Type[OptimizationRule]]]
-    _common_rules: List[Type[OptimizationRule]]
+    _rule_types: List[Type[OptimizationRule]]
 
     @classmethod
-    def register_rule(
-        cls, operand_types: List[Type[OperandType]], rule: Type[OptimizationRule]
-    ):
-        if not hasattr(cls, "_rules"):
-            cls._rules = []
-        cls._rules.append(rule)
+    def register_rule(cls, rule_type: Type[OptimizationRule]):
 
-        if not hasattr(cls, "_op_to_rules"):
-            cls._op_to_rules = defaultdict(list)
-            cls._common_rules = list()
-        for operand_type in operand_types:
-            cls._op_to_rules[operand_type].append(rule)
-            if operand_type is Operand and rule not in cls._common_rules:
-                cls._common_rules.append(rule)
-
-    @classmethod
-    def get_rule_types(
-        cls, operand_type: Type[OperandType]
-    ) -> List[Type[OptimizationRule]]:
-        rule_types = cls._op_to_rules.get(operand_type, None)
-        if rule_types is None:
-            for op_cls in operand_type.__mro__:
-                if op_cls is Operand:
-                    break
-                rule_types = cls._op_to_rules.get(op_cls)
-                if rule_types is not None:
-                    break
-            cls._op_to_rules[operand_type] = rule_types or []
-        else:
-            rule_types.extend(cls._common_rules)
-
-        return rule_types
+        if not hasattr(cls, "_rule_types"):
+            cls._rule_types = []
+        cls._rule_types.append(rule_type)
 
     @classmethod
     def _replace_inputs(cls, graph: EntityGraph, records: OptimizationRecords):
@@ -266,42 +268,19 @@ class Optimizer(ABC):
             Optimization records.
         """
         records = OptimizationRecords()
-        optimized = False
         cached_rule = functools.lru_cache(maxsize=None)(
             lambda _rule_type: _rule_type(graph, records, cls)
         )
 
-        for rule_type in cls._rules:
-            if issubclass(rule_type, CommonGraphOptimizationRule):
-                rule = rule_type(graph, records, cls)
-                rule.apply(None)
-                optimized = rule.effective
-                continue
+        for rule_type in cls._rule_types:
+            rule = cached_rule(rule_type)
+            if rule.apply():
+                cls._replace_inputs(graph, records)
+                new_results = []
+                for result in graph.results:
+                    new_results.append(
+                        records.get_optimization_result(result, default=result)
+                    )
+                graph.results = new_results
 
-            visited = set()
-            for entity in list(graph.topological_iter()):
-                op = entity.op
-                if op in visited:
-                    continue
-                visited.add(op)
-
-                rule_types = cls.get_rule_types(type(op)) or []
-                if rule_type not in rule_types:
-                    continue
-
-                rule = cached_rule(rule_type)
-                if entity not in graph:  # pragma: no cover
-                    # maybe removed during optimization
-                    continue
-                if rule.match(op):
-                    optimized = True
-                    rule.apply(op)
-        if optimized:
-            cls._replace_inputs(graph, records)
-            new_results = []
-            for result in graph.results:
-                new_results.append(
-                    records.get_optimization_result(result, default=result)
-                )
-            graph.results = new_results
         return records

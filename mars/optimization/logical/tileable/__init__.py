@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .column_pruning import ColumnPruningRule
+# TODO: the order of applying optimization rules depends on the order of import
 from .arithmetic_query import SeriesArithmeticToEval
+from .column_pruning import ColumnPruningRule
 from .core import optimize
 from .head import HeadPushDown

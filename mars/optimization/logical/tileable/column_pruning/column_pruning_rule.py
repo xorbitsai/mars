@@ -17,13 +17,12 @@ from typing import List
 import pandas as pd
 
 from .input_column_selector import InputColumnSelector
-from ..core import register_tileable_optimization_rule
+from ..core import register_optimization_rule
 from ...core import (
     OptimizationRecord,
     OptimizationRecordType,
-    CommonGraphOptimizationRule,
+    OptimizationRule,
 )
-from .....core.operand import Operand
 from .....dataframe.core import (
     parse_index,
     BaseSeriesData,
@@ -33,14 +32,14 @@ from .....dataframe.datasource.core import ColumnPruneSupportedDataSourceMixin
 from .....dataframe.groupby.aggregation import DataFrameGroupByAgg
 from .....dataframe.indexing.getitem import DataFrameIndex
 from .....dataframe.merge import DataFrameMerge
-from .....typing import OperandType, EntityType
+from .....typing import EntityType
 from .....utils import implements
 
 OPTIMIZABLE_OP_TYPES = (DataFrameMerge, DataFrameGroupByAgg)
 
 
-@register_tileable_optimization_rule([Operand])
-class ColumnPruningRule(CommonGraphOptimizationRule):
+@register_optimization_rule()
+class ColumnPruningRule(OptimizationRule):
     context = {}
 
     def _get_selected_columns(self, entity: EntityType):
@@ -196,8 +195,8 @@ class ColumnPruningRule(CommonGraphOptimizationRule):
                 node._columns_value = new_columns_value
                 node._shape = (node.shape[0], len(new_dtypes))
 
-    @implements(CommonGraphOptimizationRule.apply)
-    def apply(self, op: OperandType):
+    @implements(OptimizationRule.apply)
+    def apply(self):
         self._select_columns()
         pruned_nodes = self._insert_getitem_nodes()
         self._update_tileable_params(pruned_nodes)
