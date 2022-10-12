@@ -513,13 +513,16 @@ def test_read_csv_execution(setup):
                 "col3": np.arange(100),
             }
         )
-        df.iloc[20:, :] = pd.NA
+        df.iloc[:100, :] = pd.NA
         df.to_csv(file_path)
 
         pdf = pd.read_csv(file_path, index_col=0)
         mdf = md.read_csv(file_path, index_col=0, head_lines=10, chunk_bytes=200)
         result = mdf.execute().fetch()
         pd.testing.assert_frame_equal(pdf, result)
+
+        # dtypes is inferred as expected
+        pd.testing.assert_series_equal(mdf.dtypes, pdf.dtypes)
 
     # test compression
     with tempfile.TemporaryDirectory() as tempdir:

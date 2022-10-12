@@ -41,9 +41,20 @@ _support_kw_agg = pd_release_version >= (1, 1)
 @pytest.fixture
 def check_ref_counts():
     yield
+
+    import functools
     import gc
 
+    # In https://github.com/pandas-dev/pandas/pull/48023, pandas cache current frame in this PR
+    # which leads to failure of decref mechanism.
     gc.collect()
+    wrappers = [
+        a for a in gc.get_objects() if isinstance(a, functools._lru_cache_wrapper)
+    ]
+
+    for wrapper in wrappers:
+        wrapper.cache_clear()
+
     sess = get_default_session()
     assert len(sess._get_ref_counts()) == 0
 
@@ -115,7 +126,6 @@ def test_series_reduction(
     data = pd.Series([], dtype=float, name="a")
     r = compute(md.Series(data))
     np.testing.assert_equal(r.execute().fetch(), compute(data))
-    del r
 
 
 @pytest.mark.parametrize("func_name,func_opts", reduction_functions)
@@ -159,8 +169,6 @@ def test_series_level_reduction(setup, func_name, func_opts: FunctionOptions):
             compute(data, min_count=1, level=1).sort_index(),
             r.execute().fetch().sort_index(),
         )
-
-    del r
 
 
 @pytest.mark.parametrize("func_name,func_opts", reduction_functions)
@@ -251,8 +259,6 @@ def test_dataframe_reduction(
         compute(data1 + data2).sort_index(), r.execute().fetch().sort_index()
     )
 
-    del r
-
 
 @pytest.mark.parametrize("func_name,func_opts", reduction_functions)
 def test_dataframe_level_reduction(
@@ -324,8 +330,6 @@ def test_dataframe_level_reduction(
             compute(data, level=1, numeric_only=True).sort_index(),
             r.execute().fetch().sort_index(),
         )
-
-    del r
 
 
 @require_cudf
@@ -438,7 +442,6 @@ def test_series_bool_level_reduction(setup, check_ref_counts, func_name):
         compute(data, level=1, skipna=False).sort_index(),
         r.execute().fetch().sort_index(),
     )
-    del r
 
 
 @pytest.mark.parametrize("func_name", bool_reduction_functions)
@@ -507,7 +510,6 @@ def test_dataframe_bool_reduction(setup, check_ref_counts, func_name):
     pd.testing.assert_series_equal(
         compute(data, axis="index", bool_only=True), r.execute().fetch()
     )
-    del r
 
 
 @pytest.mark.parametrize("func_name", bool_reduction_functions)
@@ -543,7 +545,8 @@ def test_dataframe_bool_level_reduction(setup, check_ref_counts, func_name):
         r.execute().fetch().sort_index(),
     )
 
-    del r
+    # test bool_only
+    # bool_only not supported when level specified
 
 
 def test_series_count(setup, check_ref_counts):
@@ -567,8 +570,6 @@ def test_series_count(setup, check_ref_counts):
     result = series2.count().execute().fetch()
     expected = data.count()
     assert result == expected
-
-    del series2
 
 
 def test_dataframe_count(setup, check_ref_counts):
@@ -608,8 +609,6 @@ def test_dataframe_count(setup, check_ref_counts):
     result = df3.count(axis="columns", numeric_only=True).execute().fetch()
     expected = data.count(axis="columns", numeric_only=True)
     pd.testing.assert_series_equal(result, expected)
-
-    del df, df2, df3
 
 
 def test_nunique(setup, check_ref_counts):
