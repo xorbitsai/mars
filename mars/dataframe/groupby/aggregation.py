@@ -16,7 +16,7 @@ import functools
 import itertools
 import logging
 import uuid
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -976,56 +976,17 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
         return out_dict
 
     @staticmethod
-    def _do_custom_agg(op, custom_reduction, *input_objs):
-        xdf = cudf if op.gpu else pd
-        results = []
-        out = op.outputs[0]
-        for group_key in input_objs[0].groups.keys():
-            group_objs = [o.get_group(group_key) for o in input_objs]
-            agg_done = False
-            if op.stage == OperandStage.map:
-                result = custom_reduction.pre(group_objs[0])
-                agg_done = custom_reduction.pre_with_agg
-                if not isinstance(result, tuple):
-                    result = (result,)
-            else:
-                result = group_objs
+    def _do_custom_agg(
+        op: "DataFrameGroupByAgg", in_data: pd.DataFrame
+    ) -> Union[pd.Series, pd.DataFrame]:
+        from .nunique import DataFrameGroupByAggNunique
 
-            if not agg_done:
-                result = custom_reduction.agg(*result)
-                if not isinstance(result, tuple):
-                    result = (result,)
-
-            if op.stage == OperandStage.agg:
-                result = custom_reduction.post(*result)
-                if not isinstance(result, tuple):
-                    result = (result,)
-
-            if out.ndim == 2:
-                result = tuple(r.to_frame().T for r in result)
-                if op.stage == OperandStage.agg:
-                    result = tuple(r.astype(out.dtypes) for r in result)
-            else:
-                result = tuple(xdf.Series(r) for r in result)
-
-            for r in result:
-                if len(input_objs[0].grouper.names) == 1:
-                    r.index = xdf.Index(
-                        [group_key], name=input_objs[0].grouper.names[0]
-                    )
-                else:
-                    r.index = xdf.MultiIndex.from_tuples(
-                        [group_key], names=input_objs[0].grouper.names
-                    )
-            results.append(result)
-        if not results and op.stage == OperandStage.agg:
-            empty_df = pd.DataFrame(
-                [], columns=out.dtypes.index, index=out.index_value.to_pandas()[:0]
-            )
-            concat_result = (empty_df.astype(out.dtypes),)
-        else:
-            concat_result = tuple(xdf.concat(parts) for parts in zip(*results))
-        return concat_result
+        if op.stage == OperandStage.map:
+            return DataFrameGroupByAggNunique.get_execute_map_result(op, in_data)
+        elif op.stage == OperandStage.combine:
+            return DataFrameGroupByAggNunique.get_execute_combine_result(op, in_data)
+        else:  # must be OperandStage.agg, since in execute function, reduce has been excluded
+            return DataFrameGroupByAggNunique.get_execute_agg_result(op, in_data)
 
     @staticmethod
     def _do_predefined_agg(input_obj, agg_func, single_func=False, **kwds):
@@ -1061,8 +1022,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
     @classmethod
     def _execute_map(cls, ctx, op: "DataFrameGroupByAgg"):
-        from .nunique import DataFrameGroupByAggNunique
-
         xdf = cudf if op.gpu else pd
 
         in_data = ctx[op.inputs[0].key]
@@ -1119,7 +1078,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
         agg_dfs = []
         for (
             input_key,
-            raw_func_name,
             map_func_name,
             _agg_func_name,
             custom_reduction,
@@ -1128,12 +1086,8 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             kwds,
         ) in op.agg_funcs:
             input_obj = ret_map_groupbys[input_key]
-            if raw_func_name in cls.optimized_funcs:
-                agg_dfs.append(
-                    DataFrameGroupByAggNunique.get_execute_map_result(op, in_data)
-                )
-            elif map_func_name == "custom_reduction":
-                agg_dfs.extend(cls._do_custom_agg(op, custom_reduction, input_obj))
+            if map_func_name == "custom_reduction":
+                agg_dfs.append(cls._do_custom_agg(op, in_data))
             else:
                 single_func = map_func_name == op.raw_func
                 agg_dfs.append(
@@ -1153,8 +1107,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
     @classmethod
     def _execute_combine(cls, ctx, op: "DataFrameGroupByAgg"):
-        from .nunique import DataFrameGroupByAggNunique
-
         xdf = cudf if op.gpu else pd
 
         in_data_tuple = ctx[op.inputs[0].key]
@@ -1172,7 +1124,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
         combines = []
         for raw_input, (
             _input_key,
-            raw_func_name,
             _map_func_name,
             agg_func_name,
             custom_reduction,
@@ -1181,12 +1132,8 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             kwds,
         ) in zip(ctx[op.inputs[0].key], op.agg_funcs):
             input_obj = in_data_dict[output_key]
-            if raw_func_name in cls.optimized_funcs:
-                combines.append(
-                    DataFrameGroupByAggNunique.get_execute_combine_result(op, raw_input)
-                )
-            elif agg_func_name == "custom_reduction":
-                combines.extend(cls._do_custom_agg(op, custom_reduction, *input_obj))
+            if agg_func_name == "custom_reduction":
+                combines.append(cls._do_custom_agg(op, raw_input))
             else:
                 combines.append(
                     cls._do_predefined_agg(input_obj, agg_func_name, **kwds)
@@ -1195,8 +1142,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
     @classmethod
     def _execute_agg(cls, ctx, op: "DataFrameGroupByAgg"):
-        from .nunique import DataFrameGroupByAggNunique
-
         xdf = cudf if op.gpu else pd
         out_chunk = op.outputs[0]
         col_value = (
@@ -1219,7 +1164,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
 
         for (
             _input_key,
-            raw_func_name,
             _map_func_name,
             agg_func_name,
             custom_reduction,
@@ -1227,18 +1171,10 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
             _output_limit,
             kwds,
         ) in op.agg_funcs:
-            if raw_func_name in cls.optimized_funcs:
-                res = DataFrameGroupByAggNunique.get_execute_agg_result(
+            if agg_func_name == "custom_reduction":
+                in_data_dict[output_key] = cls._do_custom_agg(
                     op, in_data_dict[output_key]
                 )
-                in_data_dict[output_key] = res
-            elif agg_func_name == "custom_reduction":
-                input_obj = tuple(
-                    cls._get_grouped(op, o, ctx) for o in in_data_dict[output_key]
-                )
-                in_data_dict[output_key] = cls._do_custom_agg(
-                    op, custom_reduction, *input_obj
-                )[0]
             else:
                 input_obj = cls._get_grouped(op, in_data_dict[output_key], ctx)
                 in_data_dict[output_key] = cls._do_predefined_agg(

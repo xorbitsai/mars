@@ -39,17 +39,6 @@ class MockReduction1(md.CustomReduction):
         return v1.sum()
 
 
-class MockReduction2(md.CustomReduction):
-    def pre(self, value):
-        return value + 1, value * 2
-
-    def agg(self, v1, v2):
-        return v1.sum(), v2.min()
-
-    def post(self, v1, v2):
-        return v1 + v2
-
-
 def test_groupby(setup):
     rs = np.random.RandomState(0)
     data_size = 100
@@ -336,6 +325,7 @@ def test_dataframe_groupby_agg(setup):
         "skew",
         "kurt",
         "sem",
+        "nunique",
     ]
 
     rs = np.random.RandomState(0)
@@ -469,11 +459,6 @@ def test_dataframe_groupby_agg(setup):
         raw.groupby("c2").agg(["cumsum", "cumcount"]).sort_index(),
     )
 
-    r = mdf[["c1", "c3"]].groupby(mdf["c2"]).agg(MockReduction2())
-    pd.testing.assert_frame_equal(
-        r.execute().fetch(), raw[["c1", "c3"]].groupby(raw["c2"]).agg(MockReduction2())
-    )
-
     r = mdf.groupby("c2").agg(
         sum_c1=md.NamedAgg("c1", "sum"),
         min_c1=md.NamedAgg("c1", "min"),
@@ -503,6 +488,7 @@ def test_dataframe_groupby_agg_sort(setup):
         "skew",
         "kurt",
         "sem",
+        "nunique",
     ]
 
     rs = np.random.RandomState(0)
@@ -644,12 +630,6 @@ def test_series_groupby_agg(setup):
     pd.testing.assert_frame_equal(
         r.execute().fetch().sort_index(),
         series1.groupby(lambda x: x % 2).agg(["cumsum", "cumcount"]).sort_index(),
-    )
-
-    r = ms1.groupby(lambda x: x % 2).agg(MockReduction2(name="custom_r"), method="tree")
-    pd.testing.assert_series_equal(
-        r.execute().fetch(),
-        series1.groupby(lambda x: x % 2).agg(MockReduction2(name="custom_r")),
     )
 
     r = ms1.groupby(lambda x: x % 2).agg(col_var="var", col_skew="skew", method="tree")

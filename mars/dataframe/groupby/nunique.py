@@ -38,25 +38,23 @@ class DataFrameGroupByAggNunique:
         -------
 
         """
-        index_names = [data.index.name] if data.index.name else data.index.names
-        indexes = np.array([i for i in range(len(index_names))])
-
-        index_names = np.array(index_names)
+        index = [data.index.name] if data.index.name else data.index.names
+        index = pd.Index(index)
         level = op.groupby_params["level"]
         if isinstance(level, int):
-            indexes = [indexes[level]]
+            indexes = [level]
         elif isinstance(level, str):
-            indexes = np.argwhere(np.isin(index_names, level)).ravel().tolist()
+            indexes = [index.get_loc(level)]
         else:
             level = list(level)
             if isinstance(level[0], int):
-                indexes = indexes[level].tolist()
+                indexes = level
             else:
-                indexes = np.argwhere(np.isin(index_names, level)).ravel().tolist()
+                indexes = index.get_indexer(level).tolist()
         return indexes
 
     @classmethod
-    def _get_selection_columns(cls, op: DataFrameGroupByAgg) -> Union[None, List[str]]:
+    def _get_selection_columns(cls, op: DataFrameGroupByAgg) -> Union[None, List]:
         """
         Get groupby selection columns from op parameters.
         If this returns None, it means all columns are required.
@@ -75,7 +73,6 @@ class DataFrameGroupByAggNunique:
             else:
                 selection = [selection]
             return selection
-        return None
 
     @classmethod
     def get_execute_map_result(

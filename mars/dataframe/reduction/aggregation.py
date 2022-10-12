@@ -709,7 +709,6 @@ class DataFrameAggregate(DataFrameOperand, DataFrameOperandMixin):
         agg_dfs = []
         for (
             input_key,
-            _,
             map_func_name,
             _agg_func_name,
             custom_reduction,
@@ -754,7 +753,6 @@ class DataFrameAggregate(DataFrameOperand, DataFrameOperandMixin):
         combines = []
         for (
             _input_key,
-            _,
             _map_func_name,
             agg_func_name,
             custom_reduction,
@@ -793,7 +791,6 @@ class DataFrameAggregate(DataFrameOperand, DataFrameOperandMixin):
         # perform agg
         for (
             _input_key,
-            _,
             _map_func_name,
             agg_func_name,
             custom_reduction,
