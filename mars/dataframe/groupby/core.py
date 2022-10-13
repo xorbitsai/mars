@@ -380,16 +380,14 @@ class DataFrameGroupByOperand(MapReduceOperand, DataFrameOperandMixin):
         else:
             on = None
 
-        from itertools import count
-
+        # Get the filter rule corresponding to each df.
         dfs = df if isinstance(df, tuple) else (df,)
-
-        counter = count()
+        counter = itertools.count()
         df_filters = []
         idx_to_index_and_filters = dict()
         for item in dfs:
             is_new = True
-            for i, (index, filters) in idx_to_index_and_filters.items():
+            for _, (index, filters) in idx_to_index_and_filters.items():
                 if item.index.equals(index):
                     df_filters.append(filters)
                     is_new = False
@@ -408,21 +406,6 @@ class DataFrameGroupByOperand(MapReduceOperand, DataFrameOperandMixin):
             if is_cudf(result):  # pragma: no cover
                 result = result.copy()
             return result
-
-        # for df, filters in zip(dfs, df_filters):
-        #     for index_idx, index_filter in enumerate(filters):
-        #         if is_dataframe_obj:
-        #             reducer_index = (index_idx, chunk.index[1])
-        #         else:
-        #             reducer_index = (index_idx,)
-        #
-        #         if deliver_by:
-        #             filtered_by = []
-        #             for v in by:
-        #                 if isinstance(v, pd.Series):
-        #                     filtered_by.append(_take_index(v, index_filter))
-        #                 else:
-        #                     filtered_by.append(v)
 
         for index_idx in range(len(df_filters[0])):
             if is_dataframe_obj:
@@ -502,8 +485,6 @@ class DataFrameGroupByOperand(MapReduceOperand, DataFrameOperandMixin):
             else:
                 r.index.name = chunk.index_value.name
         if by is None:
-            if isinstance(r, str):
-                print(r)
             ctx[chunk.key] = r
         elif isinstance(r, tuple):
             ctx[chunk.key] = r + (by,)

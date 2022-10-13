@@ -316,22 +316,15 @@ def test_groupby_agg_nunique(setup, gen_data1):
     expected = df.groupby(["b", "c"], as_index=False, sort=False).agg("nunique")
     pd.testing.assert_frame_equal(r, expected)
 
-    # TODO
-    rs = np.random.RandomState(0)
-    raw = pd.DataFrame(
-        {
-            "c1": np.arange(100).astype(np.int64),
-            "c2": rs.choice(["a", "b", "c"], (100,)),
-            "c3": rs.rand(100),
-        }
-    )
-    mdf = md.DataFrame(raw, chunk_size=13)
-
-    r = (
-        mdf.groupby("c2", sort=False)
-        .agg(["sum", "nunique"], method="shuffle")
-        .execute()
-        .fetch()
-    )
-    expected = raw.groupby("c2", sort=False).agg(["sum", "nunique"])
-    pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())
+    is_sort = [True, False]
+    methods = ["auto", "shuffle", "tree"]
+    for sort in is_sort:
+        for method in methods:
+            r = (
+                mdf.groupby("b", sort=sort)
+                .agg(["sum", "nunique"], method=method)
+                .execute()
+                .fetch()
+            )
+            expected = df.groupby("b", sort=sort).agg(["sum", "nunique"])
+            pd.testing.assert_frame_equal(r.sort_index(), expected.sort_index())

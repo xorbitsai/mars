@@ -13,14 +13,19 @@
 # limitations under the License.
 from typing import List, Union
 
-import numpy as np
 import pandas as pd
 
-from .aggregation import DataFrameGroupByAgg
 from ...core import OutputType
+from ...utils import implements
+from .aggregation import DataFrameGroupByAgg
+from .custom_aggregation import (
+    DataFrameCustomGroupByAggMixin,
+    register_custom_groupby_agg_func,
+)
 
 
-class DataFrameGroupByAggNunique:
+@register_custom_groupby_agg_func("nunique")
+class DataFrameCustomGroupByNuniqueMixin(DataFrameCustomGroupByAggMixin):
     @classmethod
     def _get_level_indexes(
         cls, op: DataFrameGroupByAgg, data: pd.DataFrame
@@ -75,7 +80,7 @@ class DataFrameGroupByAggNunique:
             return selection
 
     @classmethod
-    def get_execute_map_result(
+    def _get_execute_map_result(
         cls, op: DataFrameGroupByAgg, in_data: pd.DataFrame
     ) -> Union[pd.DataFrame, pd.Series]:
         selections = cls._get_selection_columns(op)
@@ -103,7 +108,7 @@ class DataFrameGroupByAggNunique:
         return res
 
     @classmethod
-    def get_execute_combine_result(
+    def _get_execute_combine_result(
         cls, op: DataFrameGroupByAgg, in_data: pd.DataFrame
     ) -> Union[pd.DataFrame, pd.Series]:
         # in_data.index.names means MultiIndex (groupby on multi cols)
@@ -114,7 +119,7 @@ class DataFrameGroupByAggNunique:
         return res
 
     @classmethod
-    def get_execute_agg_result(
+    def _get_execute_agg_result(
         cls, op: DataFrameGroupByAgg, in_data: pd.DataFrame
     ) -> Union[pd.DataFrame, pd.Series]:
         groupby_params = op.groupby_params.copy()
@@ -133,3 +138,20 @@ class DataFrameGroupByAggNunique:
 
         res = in_data.groupby(**groupby_params).nunique()
         return res
+
+    @classmethod
+    @implements(DataFrameCustomGroupByAggMixin.execute_map)
+    def execute_map(cls, op, in_data: pd.DataFrame) -> Union[pd.DataFrame, pd.Series]:
+        return cls._get_execute_map_result(op, in_data)
+
+    @classmethod
+    @implements(DataFrameCustomGroupByAggMixin.execute_combine)
+    def execute_combine(
+        cls, op, in_data: pd.DataFrame
+    ) -> Union[pd.DataFrame, pd.Series]:
+        return cls._get_execute_combine_result(op, in_data)
+
+    @classmethod
+    @implements(DataFrameCustomGroupByAggMixin.execute_agg)
+    def execute_agg(cls, op, in_data: pd.DataFrame) -> Union[pd.DataFrame, pd.Series]:
+        return cls._get_execute_agg_result(op, in_data)
