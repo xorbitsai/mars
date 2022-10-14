@@ -14,7 +14,6 @@
 
 import itertools
 from functools import partial
-from typing import Set
 
 import numpy as np
 import pandas as pd
@@ -349,13 +348,6 @@ class DataFrameGroupByOperand(MapReduceOperand, DataFrameOperandMixin):
             params["nsplits"] = ((np.nan,) * len(out_chunks),)
         params["chunks"] = out_chunks
         return new_op.new_tileables(new_inputs, **params)
-
-    @classmethod
-    def _is_index_same_in(cls, df: pd.DataFrame, others: Set[pd.DataFrame]):
-        for obj in others:
-            if not df.index.equals(obj.index):
-                return False
-        return True
 
     @classmethod
     def execute_map(cls, ctx, op):
