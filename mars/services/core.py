@@ -134,7 +134,7 @@ def _normalize_modules(modules: _ModulesType):
         modules = [modules]
     else:
         modules = list(modules)
-    modules = [__name__.rsplit('.', 1)[0]] + modules
+    modules = [__name__.rsplit(".", 1)[0]] + modules
     return modules
 
 
