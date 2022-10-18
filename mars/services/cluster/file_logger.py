@@ -31,7 +31,7 @@ class FileLoggerActor(mo.Actor):
         file_path = os.environ.get(MARS_LOG_PATH_KEY)
         # other situations: start cluster not from cmdline
         if file_path is None:
-            logger.warning("Env {0} is not set!".format(MARS_LOG_PATH_KEY))
+            logger.debug("Env {0} is not set!".format(MARS_LOG_PATH_KEY))
             mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
             _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
             os.environ[MARS_LOG_PATH_KEY] = file_path
