@@ -56,10 +56,18 @@ class AbstractGraphAssigner(ABC):
             From node to band.
         """
 
+    def _is_gpu_band(self) -> bool:
+        gpu_ops = (
+            [op for op in self._start_ops if not isinstance(op, Fetch)]
+            if self._start_ops
+            else []
+        )
+        if gpu_ops and all(op.gpu for op in gpu_ops):
+            return True
+        return False
+
     def get_device_band_slots(self) -> Dict[BandType, int]:
-        if self._start_ops and all(
-            op.gpu for op in self._start_ops if not isinstance(op, Fetch)
-        ):  # pragma: no cover
+        if self._is_gpu_band():  # pragma: no cover
             band_prefix = "gpu"
         else:
             band_prefix = "numa"
