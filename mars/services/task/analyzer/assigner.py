@@ -20,7 +20,7 @@ from typing import List, Dict, Union
 import numpy as np
 
 from ....core import ChunkGraph, ChunkData
-from ....core.operand import Operand
+from ....core.operand import Operand, Fetch
 from ....lib.ordered_set import OrderedSet
 from ....resource import Resource
 from ....typing import BandType
@@ -58,7 +58,7 @@ class AbstractGraphAssigner(ABC):
 
     def get_device_band_slots(self) -> Dict[BandType, int]:
         if self._start_ops and all(
-            op.gpu for op in self._start_ops
+            op.gpu for op in self._start_ops if not isinstance(op, Fetch)
         ):  # pragma: no cover
             band_prefix = "gpu"
         else:

@@ -52,7 +52,12 @@ from ..reduction.core import (
     ReductionAggStep,
 )
 from ..reduction.aggregation import is_funcs_aggregate, normalize_reduction_funcs
-from ..utils import parse_index, build_concatenated_rows_frame, is_cudf
+from ..utils import (
+    parse_index,
+    build_concatenated_rows_frame,
+    is_cudf,
+    concat_on_columns,
+)
 from .core import DataFrameGroupByOperand
 from .sort import (
     DataFramePSRSGroupbySample,
@@ -1256,7 +1261,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
         aggs = [item[0] for item in aggs]
 
         if out_chunk.ndim == 2:
-            result = xdf.concat(aggs, axis=1)
+            result = concat_on_columns(aggs)
             if (
                 not op.groupby_params.get("as_index", True)
                 and col_value.nlevels == result.columns.nlevels
