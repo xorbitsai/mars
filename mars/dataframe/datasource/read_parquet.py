@@ -231,7 +231,8 @@ class FastpaquetEngine(ParquetEngine):
 
 
 class CudfEngine:
-    def read_to_cudf(self, file, columns: list = None, nrows: int = None, **kwargs):
+    @classmethod
+    def read_to_cudf(cls, file, columns: list = None, nrows: int = None, **kwargs):
         df = cudf.read_parquet(file, columns=columns, **kwargs)
         if nrows is not None:
             df = df.head(nrows)
@@ -244,8 +245,9 @@ class CudfEngine:
             file, columns=columns, nrows=nrows, row_groups=group_index, **kwargs
         )
 
+    @classmethod
     def read_partitioned_to_cudf(
-        self,
+        cls,
         file,
         partitions: "pq.ParquetPartitions",
         partition_keys: List[Tuple],
@@ -545,7 +547,6 @@ class DataFrameReadParquet(
 
     @classmethod
     def execute(cls, ctx, op: "DataFrameReadParquet"):
-        xdf = cudf if op.gpu else pd
         if not op.gpu:
             cls._pandas_read_parquet(ctx, op)
         else:
