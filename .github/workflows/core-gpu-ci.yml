@@ -33,9 +33,9 @@ jobs:
       - name: Run GPU CI
         shell: bash
         run: |
-          /opt/conda/bin/coverage run -m pytest ./ -m cuda
-          /opt/conda/bin/coverage combine
-          /opt/conda/bin/coverage xml
+          coverage run -m pytest ./ -m cuda
+          coverage combine
+          coverage xml
 
       - name: Report coverage data
         shell: bash
