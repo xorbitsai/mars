@@ -11,6 +11,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ false }}  # disable for now
     name: Build wheels on ${{ matrix.os }} for ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
