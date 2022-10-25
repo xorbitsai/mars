@@ -30,7 +30,7 @@ from ..operands import DataFrameOperand, DataFrameOperandMixin
 from ..utils import parse_index, lazy_import
 
 
-cudf = lazy_import('cudf')
+cudf = lazy_import("cudf")
 
 
 class DataFrameToDatetime(DataFrameOperand, DataFrameOperandMixin):
