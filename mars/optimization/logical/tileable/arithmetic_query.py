@@ -77,6 +77,8 @@ class SeriesArithmeticToEval(OperandBasedOptimizationRule):
 
     @implements(OperandBasedOptimizationRule.match_operand)
     def match_operand(self, op: OperandType) -> bool:
+        if op.gpu:
+            return False
         _, expr, _ = self._extract_eval_expression(op.outputs[0])
         return expr is not None
 
@@ -137,7 +139,7 @@ class SeriesArithmeticToEval(OperandBasedOptimizationRule):
 
     @classmethod
     def _extract_column_select(cls, tileable) -> EvalExtractRecord:
-        return EvalExtractRecord(tileable.inputs[0], f"`{tileable.op.col_names}`")
+        return EvalExtractRecord(tileable.inputs[0], f"{tileable.op.col_names}")
 
     def _extract_unary(self, tileable) -> EvalExtractRecord:
         op = tileable.op
@@ -224,7 +226,8 @@ class _DataFrameEvalRewriteRule(OperandBasedOptimizationRule):
     def match_operand(self, op: OperandType) -> bool:
         optimized_eval_op = self._get_optimized_eval_op(op)
         if (
-            not isinstance(optimized_eval_op, DataFrameEval)
+            op.gpu
+            or not isinstance(optimized_eval_op, DataFrameEval)
             or optimized_eval_op.is_query
             or optimized_eval_op.inputs[0].key != op.inputs[0].key
         ):
