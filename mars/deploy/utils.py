@@ -48,9 +48,7 @@ def wait_services_ready(
 
 
 def load_service_config_file(path: Union[str, TextIO]) -> Dict:
-    import mars
-
-    mars_path = os.path.dirname(os.path.abspath(mars.__file__))
+    mars_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     cfg_stack = []  # type: List[Dict]
     cfg_file_set = set()

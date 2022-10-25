@@ -15,7 +15,7 @@ import logging
 import os
 import tempfile
 
-from mars import oscar as mo
+from ... import oscar as mo
 from ...constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
 
 logger = logging.getLogger(__name__)
