@@ -1159,47 +1159,47 @@ def test_read_parquet_fast_parquet(setup):
 
 @require_cudf
 def test_read_parquet_gpu_execution(setup_gpu):
-    # with tempfile.TemporaryDirectory() as tempdir:
-    #     file_path = os.path.join(tempdir, "test.parquet")
-    #
-    #     df = pd.DataFrame(
-    #         {
-    #             "col1": np.random.rand(100),
-    #             "col2": np.random.choice(["a", "b", "c"], (100,)),
-    #             "col3": np.arange(100),
-    #         }
-    #     )
-    #     df.to_parquet(file_path, index=False)
-    #
-    #     pdf = pd.read_parquet(file_path)
-    #     mdf = md.read_parquet(file_path, gpu=True).execute().fetch()
-    #     pd.testing.assert_frame_equal(
-    #         pdf.reset_index(drop=True), mdf.to_pandas().reset_index(drop=True)
-    #     )
-    #
-    #     mdf2 = md.read_parquet(file_path, gpu=True, chunk_bytes=200).execute().fetch()
-    #     pd.testing.assert_frame_equal(
-    #         pdf.reset_index(drop=True), mdf2.to_pandas().reset_index(drop=True)
-    #     )
-    #
-    # with tempfile.TemporaryDirectory() as tempdir:
-    #     file_path = os.path.join(tempdir, "test.parquet")
-    #     test_df = pd.DataFrame(
-    #         {
-    #             "a": np.arange(10).astype(np.int64, copy=False),
-    #             "b": [f"s{i}" for i in range(10)],
-    #             "c": np.random.rand(10),
-    #         }
-    #     )
-    #     test_df.to_parquet(file_path, row_group_size=3)
-    #
-    #     df = md.read_parquet(
-    #         file_path, groups_as_chunks=True, columns=["a", "b"], gpu=True
-    #     )
-    #     result = df.execute().fetch().to_pandas()
-    #     pd.testing.assert_frame_equal(
-    #         result.reset_index(drop=True), test_df[["a", "b"]]
-    #     )
+    with tempfile.TemporaryDirectory() as tempdir:
+        file_path = os.path.join(tempdir, "test.parquet")
+
+        df = pd.DataFrame(
+            {
+                "col1": np.random.rand(100),
+                "col2": np.random.choice(["a", "b", "c"], (100,)),
+                "col3": np.arange(100),
+            }
+        )
+        df.to_parquet(file_path, index=False)
+
+        pdf = pd.read_parquet(file_path)
+        mdf = md.read_parquet(file_path, gpu=True).execute().fetch()
+        pd.testing.assert_frame_equal(
+            pdf.reset_index(drop=True), mdf.to_pandas().reset_index(drop=True)
+        )
+
+        mdf2 = md.read_parquet(file_path, gpu=True, chunk_bytes=200).execute().fetch()
+        pd.testing.assert_frame_equal(
+            pdf.reset_index(drop=True), mdf2.to_pandas().reset_index(drop=True)
+        )
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        file_path = os.path.join(tempdir, "test.parquet")
+        test_df = pd.DataFrame(
+            {
+                "a": np.arange(10).astype(np.int64, copy=False),
+                "b": [f"s{i}" for i in range(10)],
+                "c": np.random.rand(10),
+            }
+        )
+        test_df.to_parquet(file_path, row_group_size=3)
+
+        df = md.read_parquet(
+            file_path, groups_as_chunks=True, columns=["a", "b"], gpu=True
+        )
+        result = df.execute().fetch().to_pandas()
+        pd.testing.assert_frame_equal(
+            result.reset_index(drop=True), test_df[["a", "b"]]
+        )
 
     # test partitioned
     with tempfile.TemporaryDirectory() as tempdir:

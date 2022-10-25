@@ -139,7 +139,7 @@ class SeriesArithmeticToEval(OperandBasedOptimizationRule):
 
     @classmethod
     def _extract_column_select(cls, tileable) -> EvalExtractRecord:
-        return EvalExtractRecord(tileable.inputs[0], f"{tileable.op.col_names}")
+        return EvalExtractRecord(tileable.inputs[0], f"`{tileable.op.col_names}`")
 
     def _extract_unary(self, tileable) -> EvalExtractRecord:
         op = tileable.op
