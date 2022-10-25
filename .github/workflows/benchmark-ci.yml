@@ -12,7 +12,6 @@ concurrency:
 
 jobs:
   asv-benchmarks:
-    if: ${{ false }}  # disable for now
     name: ASV Benchmarks
     runs-on: ubuntu-latest
     defaults:
