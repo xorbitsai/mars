@@ -33,7 +33,7 @@ jobs:
       - name: Run GPU CI
         shell: bash
         run: |
-          /opt/conda/bin/coverage run -m /opt/conda/bin/pytest ./ -m cuda
+          /opt/conda/bin/coverage run -m pytest ./ -m cuda
           /opt/conda/bin/coverage combine
           /opt/conda/bin/coverage xml
 
