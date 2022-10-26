@@ -65,8 +65,6 @@ from .router import Router
 logger = logging.getLogger(__name__)
 ray = lazy_import("ray")
 
-DEFAULT_MODULES = ["mars.tensor", "mars.dataframe", "mars.learn", "mars.remote"]
-
 
 class _ErrorProcessor:
     def __init__(self, address: str, message_id: bytes, protocol):
@@ -1373,6 +1371,8 @@ async def create_actor_pool(
     on_process_recover: Callable[[MainActorPoolType, str], None] = None,
     **kwargs,
 ) -> MainActorPoolType:
+    from ... import tensor, dataframe, learn, remote
+
     if n_process is None:
         n_process = multiprocessing.cpu_count()
     if labels and len(labels) != n_process + 1:
@@ -1396,7 +1396,12 @@ async def create_actor_pool(
         except ImportError:
             use_uvloop = False
 
-    modules = list(modules or []) + DEFAULT_MODULES
+    modules = list(modules or []) + [
+        tensor.__name__,
+        dataframe.__name__,
+        learn.__name__,
+        remote.__name__,
+    ]
 
     external_addresses = pool_cls.get_external_addresses(
         address, n_process=n_process, ports=ports
