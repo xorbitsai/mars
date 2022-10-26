@@ -1177,9 +1177,14 @@ def test_read_parquet_gpu_execution(setup_gpu):
             pdf.reset_index(drop=True), mdf.to_pandas().reset_index(drop=True)
         )
 
-        mdf2 = md.read_parquet(file_path, gpu=True, chunk_bytes=200).execute().fetch()
+        mdf2 = md.read_parquet(file_path, gpu=True).execute().fetch()
         pd.testing.assert_frame_equal(
             pdf.reset_index(drop=True), mdf2.to_pandas().reset_index(drop=True)
+        )
+
+        mdf3 = md.read_parquet(file_path, gpu=True).head(3).execute().fetch()
+        pd.testing.assert_frame_equal(
+            pdf.reset_index(drop=True).head(3), mdf3.to_pandas().reset_index(drop=True)
         )
 
     with tempfile.TemporaryDirectory() as tempdir:

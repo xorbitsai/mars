@@ -510,7 +510,7 @@ class DataFrameReadParquet(
         if os.path.exists(path):
             file = op.path
             close = lambda: None
-        else:
+        else:  # pragma: no cover
             file = open_file(path, storage_options=op.storage_options)
             close = file.close
 

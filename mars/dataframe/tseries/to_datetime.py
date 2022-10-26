@@ -167,8 +167,11 @@ class DataFrameToDatetime(DataFrameOperand, DataFrameOperandMixin):
     def execute(cls, ctx, op: "DataFrameToDatetime"):
         arg = ctx[op.arg.key]
 
+        unit = op.unit
         if cudf and op.gpu:
             func = cudf.to_datetime
+            if unit is None:
+                unit = "ns"
         else:
             func = pd.to_datetime
 
@@ -180,7 +183,7 @@ class DataFrameToDatetime(DataFrameOperand, DataFrameOperandMixin):
             utc=op.utc,
             format=op.format,
             exact=op.exact,
-            unit=op.unit,
+            unit=unit,
             infer_datetime_format=op.infer_datetime_format,
             origin=op.origin,
             cache=op.cache,
