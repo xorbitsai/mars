@@ -120,7 +120,7 @@ class SenderManagerActor(mo.StatelessActor):
                 return result
 
         for data_key, reader, info in zip(data_keys, readers, infos):
-            if info.offset:
+            if info.offset is not None:
                 await reader.seek(info.offset)
                 reader = AsyncFixedReader(reader, info.store_size)
             while True:

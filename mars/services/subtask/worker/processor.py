@@ -15,8 +15,10 @@
 import asyncio
 import logging
 import sys
+import random
 import time
 from collections import defaultdict
+from string import ascii_letters, digits
 from typing import Any, Dict, List, Optional, Set, Type
 
 from .... import oscar as mo
@@ -383,7 +385,9 @@ class SubtaskProcessor:
         buffer_list = await asyncio.gather(*serialization_tasks)
         sizes = [sum(len(b) for b in buf) for buf in buffer_list]
         writer = await self._storage_api.open_writer(data_keys, sizes, multi=True)
-        main_key = data_keys[0][0]
+        main_key = (
+            "".join(random.choice(ascii_letters + digits) for _ in range(30)),
+        )
         writer.set_main_key(main_key)
         for buffers, data_key in zip(buffer_list, data_keys):
             for buf in buffers:

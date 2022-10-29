@@ -299,14 +299,15 @@ class DataManagerActor(mo.Actor):
         if (session_id, data_key) in self._sub_key_to_main_key:
             store_info = self._sub_key_to_main_key[(session_id, data_key)]
             main_key_info = _get_lowest_info(store_info.main_key)
-            return DataInfo(
-                main_key_info.object_id,
-                main_key_info.level,
-                store_info.size,
-                store_info.size,
-                main_key_info.band,
-                store_info.offset,
-            )
+            if main_key_info is not None:
+                return DataInfo(
+                    main_key_info.object_id,
+                    main_key_info.level,
+                    store_info.size,
+                    store_info.size,
+                    main_key_info.band,
+                    store_info.offset,
+                )
         else:
             return _get_lowest_info(data_key)
 
