@@ -247,14 +247,14 @@ class StorageAPI(AbstractStorageAPI):
         return await self._storage_handler_ref.open_reader(self._session_id, data_key)
 
     async def open_writer(
-        self, data_key: str, size: int, level: StorageLevel
+        self, data_key: Union[Tuple, str], size: int, level: StorageLevel = None
     ) -> WrappedStorageFileObject:
         """
         Return a file-like object for writing data.
 
         Parameters
         ----------
-        data_key: str
+        data_key: str or tuple
             data key
         size: int
             the total size of data
