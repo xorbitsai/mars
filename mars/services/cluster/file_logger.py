@@ -17,6 +17,7 @@ import tempfile
 
 from ... import oscar as mo
 from ...constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
+from ...deploy.oscar.cmdline import OscarCommandRunner
 
 logger = logging.getLogger(__name__)
 
@@ -35,22 +36,49 @@ class FileLoggerActor(mo.Actor):
             mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
             _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
             os.environ[MARS_LOG_PATH_KEY] = file_path
+            # make logs on the web effective
+            logging.config.fileConfig(
+                self._get_file_config(), disable_existing_loggers=False
+            )
         self._log_filename = file_path
 
-    def fetch_logs(self, size: int) -> str:
+    @staticmethod
+    def _get_file_config():
+        fp = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "deploy",
+            "oscar",
+            "file-logging.conf",
+        )
+        config = OscarCommandRunner.parse_file_logging_config(
+            fp, level="DEBUG", formatter=None
+        )
+        # console log keeps the default level and formatter as before
+        # file log on the web uses debug level and the formatter in the config file
+        config["handler_stream_handler"]["level"] = "WARN"
+        config["handler_stream_handler"].pop("formatter")
+
+        return config
+
+    def fetch_logs(self, size: int, start_pos: int) -> str:
         """
         Externally exposed interface.
 
         Parameters
         ----------
         size
+        start_pos
 
         Returns
         -------
 
         """
-
-        content = self._get_n_bytes_tail_file(size)
+        if size != -1:
+            content = self._get_n_bytes_tail_file(size)
+        else:
+            content = self._get_n_bytes_from_pos(10 * 1024 * 1024, start_pos)
         return content
 
     def _get_n_bytes_tail_file(self, bytes_num: int) -> str:
@@ -65,11 +93,8 @@ class FileLoggerActor(mo.Actor):
         -------
 
         """
-        if bytes_num != -1:
-            f_size = os.stat(self._log_filename).st_size
-            target = f_size - bytes_num if f_size > bytes_num else 0
-        else:
-            target = 0
+        f_size = os.stat(self._log_filename).st_size
+        target = f_size - bytes_num if f_size > bytes_num else 0
         with open(self._log_filename) as f:
             f.seek(target)
             if target == 0:
@@ -78,4 +103,21 @@ class FileLoggerActor(mo.Actor):
                 f.readline()
                 res = f.read()
 
+        return res
+
+    def _get_n_bytes_from_pos(self, size: int, start_pos: int) -> str:
+        """
+        Read n bytes from a position.
+        Parameters
+        ----------
+        size
+        start_pos
+
+        Returns
+        -------
+
+        """
+        with open(self._log_filename) as f:
+            f.seek(start_pos)
+            res = f.read(size)
         return res

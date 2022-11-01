@@ -6,6 +6,7 @@ import Button from '@material-ui/core/Button';
 import SaveIcon from '@material-ui/icons/Save';
 import Grid from '@material-ui/core/Grid';
 import PropTypes from 'prop-types';
+import FileSaver from 'file-saver';
 
 
 export default class NodeLogTab extends React.Component {
@@ -88,16 +89,24 @@ export default class NodeLogTab extends React.Component {
       this.props.endpoint, '_',
       this.getTimestamp().toString(), '_',
       'log.txt');
-    fetch(`api/cluster/logs?address=${this.props.endpoint}&&size=-1`)
-      .then(res => res.blob().then(blob => {
-        let a = document.createElement('a');
-        let url = window.URL.createObjectURL(blob);
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a = null;
-      }));
+    // let a = document.createElement('a');
+    // let b = new Blob();
+    // let url = window.URL.createObjectURL(b);
+    // a.href = url;
+    // a.download = filename;
+    // fetch(`api/cluster/logs?address=${this.props.endpoint}&&size=-1`)
+    //   .then(res => res.blob().then(blob => {
+    //     // let a = document.createElement('a');
+    //     // let url = window.URL.createObjectURL(blob);
+    //     // a.href = url;
+    //     // a.download = filename;
+    //     // a.click();
+    //     b = new Blob([b, blob]);
+    //     a.click();
+    //     window.URL.revokeObjectURL(url);
+    //     a = null;
+    //   }));
+    FileSaver.saveAs(`api/cluster/logs?address=${this.props.endpoint}&&size=-1`, filename);
   }
 }
 

@@ -314,9 +314,11 @@ class ClusterAPI(AbstractClusterAPI):
             FileLoggerActor.default_uid(), address=address or self._address
         )
 
-    async def fetch_node_log(self, size: int = None, address: str = None) -> str:
+    async def fetch_node_log(
+        self, size: int, address: str = None, start_pos: int = 0
+    ) -> str:
         ref = await self._get_log_ref(address)
-        return await ref.fetch_logs(size)
+        return await ref.fetch_logs(size, start_pos)
 
 
 class MockClusterAPI(ClusterAPI):

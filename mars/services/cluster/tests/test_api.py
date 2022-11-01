@@ -148,14 +148,14 @@ async def test_web_api(actor_pool):
     assert len(stacks) > 0
 
     log_content = await web_api.fetch_node_log(size=None, address=pool_addr)
-    assert len(log_content) == 0
+    assert len(log_content) > 0
 
     log_content = await web_api.fetch_node_log(size=5, address=pool_addr)
     assert len(log_content) == 0
 
     log_content = await web_api.fetch_node_log(size=-1, address=pool_addr)
     assert type(log_content) is str
-    assert len(log_content) == 0
+    assert len(log_content) > 0
 
     await MockClusterAPI.cleanup(pool_addr)
 

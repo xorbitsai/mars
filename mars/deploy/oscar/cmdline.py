@@ -97,7 +97,7 @@ class OscarCommandRunner:
         os.environ[MARS_LOG_PATH_KEY] = file_path
 
     @staticmethod
-    def _parse_file_logging_config(
+    def parse_file_logging_config(
         file_path: str, level: str, formatter: str = None
     ) -> configparser.ConfigParser:
         config = configparser.ConfigParser()
@@ -152,7 +152,7 @@ class OscarCommandRunner:
                 # default log conf file
                 if i == len(config_paths) - 1:
                     # bind user's level and format when using default log conf
-                    parser = self._parse_file_logging_config(
+                    parser = self.parse_file_logging_config(
                         conf_path, log_level, formatter
                     )
                     logging.config.fileConfig(parser, disable_existing_loggers=False)

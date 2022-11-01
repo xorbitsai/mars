@@ -71,30 +71,41 @@ async def test_file_logger_without_env(actor_pool, caplog):
 
     byte_num = 5
     expected_data = ""
-    content = await logger_ref.fetch_logs(byte_num)
+    content = await logger_ref.fetch_logs(byte_num, 0)
     assert content == expected_data
 
     byte_num = 6
     expected_data = "nm,./"
-    content = await logger_ref.fetch_logs(byte_num)
+    content = await logger_ref.fetch_logs(byte_num, 0)
     assert content == expected_data
 
     byte_num = 11
     expected_data = "nm,./"
-    content = await logger_ref.fetch_logs(byte_num)
+    content = await logger_ref.fetch_logs(byte_num, 0)
     assert content == expected_data
 
     byte_num = 12
     expected_data = "hjkl;\nnm,./"
-    content = await logger_ref.fetch_logs(byte_num)
+    content = await logger_ref.fetch_logs(byte_num, 0)
     assert content == expected_data
 
     byte_num = 50
     expected_data = "qwert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
-    content = await logger_ref.fetch_logs(byte_num)
+    content = await logger_ref.fetch_logs(byte_num, 0)
     assert content == expected_data
 
     byte_num = -1
     expected_data = "qwert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
-    content = await logger_ref.fetch_logs(byte_num)
+    content = await logger_ref.fetch_logs(byte_num, 0)
+    assert content == expected_data
+
+    byte_num = -1
+    start_pos = 1
+    expected_data = "wert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
+    content = await logger_ref.fetch_logs(byte_num, start_pos)
+    assert content == expected_data
+
+    start_pos = 35
+    expected_data = ""
+    content = await logger_ref.fetch_logs(byte_num, start_pos)
     assert content == expected_data

@@ -166,17 +166,29 @@ class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
         cluster_api = await self._get_cluster_api()
         address = self.get_argument("address", "") or None
         # 10MB by default
-        # TODO chunk log for very large log file
         size = int(self.get_argument("size", str(10 * 1024 * 1024)))
-        content = await cluster_api.fetch_node_log(size, address=address)
+        start_pos = 0
+        content = await cluster_api.fetch_node_log(
+            size, address=address, start_pos=start_pos
+        )
         if size != -1:
             self.write(json.dumps({"content": content}))
         # size == -1 means downloading the current file
         else:
             self.set_header("Content-Type", "application/octet-stream")
             self.set_header("Content-Disposition", "attachment")
-            self.write(content)
-            await self.finish()
+
+            while True:
+                if len(content) == 0:  # read to file end
+                    await self.finish()
+                    break
+                else:
+                    self.write(content)
+                    await self.flush()
+                start_pos = start_pos + len(content)
+                content = await cluster_api.fetch_node_log(
+                    size, address=address, start_pos=start_pos
+                )
 
 
 web_handlers = {ClusterWebAPIHandler.get_root_pattern(): ClusterWebAPIHandler}
