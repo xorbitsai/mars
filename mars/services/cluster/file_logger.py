@@ -62,14 +62,14 @@ class FileLoggerActor(mo.Actor):
 
         return config
 
-    def fetch_logs(self, size: int, start_pos: int) -> str:
+    def fetch_logs(self, size: int, offset: int) -> str:
         """
         Externally exposed interface.
 
         Parameters
         ----------
         size
-        start_pos
+        offset
 
         Returns
         -------
@@ -78,7 +78,7 @@ class FileLoggerActor(mo.Actor):
         if size != -1:
             content = self._get_n_bytes_tail_file(size)
         else:
-            content = self._get_n_bytes_from_pos(10 * 1024 * 1024, start_pos)
+            content = self._get_n_bytes_from_pos(10 * 1024 * 1024, offset)
         return content
 
     def _get_n_bytes_tail_file(self, bytes_num: int) -> str:
@@ -105,19 +105,19 @@ class FileLoggerActor(mo.Actor):
 
         return res
 
-    def _get_n_bytes_from_pos(self, size: int, start_pos: int) -> str:
+    def _get_n_bytes_from_pos(self, size: int, offset: int) -> str:
         """
         Read n bytes from a position.
         Parameters
         ----------
         size
-        start_pos
+        offset
 
         Returns
         -------
 
         """
         with open(self._log_filename) as f:
-            f.seek(start_pos)
+            f.seek(offset)
             res = f.read(size)
         return res

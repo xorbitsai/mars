@@ -100,12 +100,12 @@ async def test_file_logger_without_env(actor_pool, caplog):
     assert content == expected_data
 
     byte_num = -1
-    start_pos = 1
+    offset = 1
     expected_data = "wert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
-    content = await logger_ref.fetch_logs(byte_num, start_pos)
+    content = await logger_ref.fetch_logs(byte_num, offset)
     assert content == expected_data
 
-    start_pos = 35
+    offset = 35
     expected_data = ""
-    content = await logger_ref.fetch_logs(byte_num, start_pos)
+    content = await logger_ref.fetch_logs(byte_num, offset)
     assert content == expected_data

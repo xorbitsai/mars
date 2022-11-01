@@ -315,10 +315,10 @@ class ClusterAPI(AbstractClusterAPI):
         )
 
     async def fetch_node_log(
-        self, size: int, address: str = None, start_pos: int = 0
+        self, size: int, address: str = None, offset: int = 0
     ) -> str:
         ref = await self._get_log_ref(address)
-        return await ref.fetch_logs(size, start_pos)
+        return await ref.fetch_logs(size, offset)
 
 
 class MockClusterAPI(ClusterAPI):

@@ -107,6 +107,9 @@ class OscarCommandRunner:
             "logger_deploy",
             "logger_oscar",
             "logger_services",
+            "logger_dataframe",
+            "logger_learn",
+            "logger_tensor",
             "handler_stream_handler",
             "handler_file_handler",
         ]
