@@ -363,7 +363,9 @@ class WebClusterAPI(AbstractClusterAPI, MarsWebAPIClientMixin):
         res = await self._request_url("GET", path)
         return list(json.loads(res.body)["stacks"])
 
-    async def fetch_node_log(self, size: int = None, address: str = None) -> str:
+    async def fetch_node_log(
+        self, size: int = None, address: str = None, start_pos: int = 0
+    ) -> str:
         path = f"{self._address}/api/cluster/logs?address={address}"
         if size is not None:
             path += f"&&size={size}"
