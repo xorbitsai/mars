@@ -1,3 +1,18 @@
+/*
+ * Copyright 2022 XProbe Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 import React from 'react';
 import Title from '../Title';
 import Paper from '@material-ui/core/Paper';
@@ -6,7 +21,7 @@ import Button from '@material-ui/core/Button';
 import SaveIcon from '@material-ui/icons/Save';
 import Grid from '@material-ui/core/Grid';
 import PropTypes from 'prop-types';
-import FileSaver from 'file-saver';
+import streamSaver from 'streamsaver';
 
 
 export default class NodeLogTab extends React.Component {
@@ -89,24 +104,26 @@ export default class NodeLogTab extends React.Component {
       this.props.endpoint, '_',
       this.getTimestamp().toString(), '_',
       'log.txt');
-    // let a = document.createElement('a');
-    // let b = new Blob();
-    // let url = window.URL.createObjectURL(b);
-    // a.href = url;
-    // a.download = filename;
-    // fetch(`api/cluster/logs?address=${this.props.endpoint}&&size=-1`)
-    //   .then(res => res.blob().then(blob => {
-    //     // let a = document.createElement('a');
-    //     // let url = window.URL.createObjectURL(blob);
-    //     // a.href = url;
-    //     // a.download = filename;
-    //     // a.click();
-    //     b = new Blob([b, blob]);
-    //     a.click();
-    //     window.URL.revokeObjectURL(url);
-    //     a = null;
-    //   }));
-    FileSaver.saveAs(`api/cluster/logs?address=${this.props.endpoint}&&size=-1`, filename);
+    fetch(`api/cluster/logs?address=${this.props.endpoint}&&size=-1`)
+      .then(response => {
+        const fileStream = streamSaver.createWriteStream(filename);
+        const readableStream = response.body;
+        // more optimized pipe version
+        // (Safari may have pipeTo, but it's useless without the WritableStream)
+        if (window.WritableStream && readableStream.pipeTo) {
+          return readableStream.pipeTo(fileStream);
+        }
+        // Write (pipe) manually
+        window.writer = fileStream.getWriter();
+        let writer = window.writer;
+
+        const reader = readableStream.getReader();
+        const pump = () => reader.read()
+          .then(res => res.done
+            ? writer.close()
+            : writer.write(res.value).then(pump));
+        pump();
+      });
   }
 }
 
