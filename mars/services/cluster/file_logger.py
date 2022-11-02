@@ -13,11 +13,9 @@
 # limitations under the License.
 import logging
 import os
-import tempfile
 
 from ... import oscar as mo
-from ...constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
-from ...deploy.oscar.cmdline import OscarCommandRunner
+from ...constants import MARS_LOG_PATH_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -30,37 +28,7 @@ class FileLoggerActor(mo.Actor):
 
     def __init__(self):
         file_path = os.environ.get(MARS_LOG_PATH_KEY)
-        # other situations: start cluster not from cmdline
-        if file_path is None:
-            logger.debug("Env {0} is not set!".format(MARS_LOG_PATH_KEY))
-            mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
-            _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
-            os.environ[MARS_LOG_PATH_KEY] = file_path
-            # make logs on the web effective
-            logging.config.fileConfig(
-                self._get_file_config(), disable_existing_loggers=False
-            )
         self._log_filename = file_path
-
-    @staticmethod
-    def _get_file_config():
-        fp = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "..",
-            "deploy",
-            "oscar",
-            "file-logging.conf",
-        )
-        config = OscarCommandRunner.parse_file_logging_config(
-            fp, level="DEBUG", formatter=None
-        )
-        # console log keeps the default level and formatter as before
-        # file log on the web uses debug level and the formatter in the config file
-        config["handler_stream_handler"]["level"] = "WARN"
-        config["handler_stream_handler"].pop("formatter")
-
-        return config
 
     def fetch_logs(self, size: int, offset: int) -> str:
         """

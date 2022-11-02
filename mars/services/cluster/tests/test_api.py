@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import os
+import tempfile
 
 import pytest
 
@@ -21,11 +23,16 @@ from ..core import NodeStatus
 from ... import NodeRole
 from ...web.supervisor import WebSupervisorService
 from .... import oscar as mo
+from ....constants import MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX, MARS_LOG_PATH_KEY
 from ....utils import clean_mars_tmp_dir, get_next_port
 
 
 @pytest.fixture
 async def actor_pool():
+    # prepare
+    mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
+    _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
+    os.environ[MARS_LOG_PATH_KEY] = file_path
     pool = await mo.create_actor_pool("127.0.0.1", n_process=0)
     async with pool:
         yield pool
@@ -148,14 +155,20 @@ async def test_web_api(actor_pool):
     assert len(stacks) > 0
 
     log_content = await web_api.fetch_node_log(size=None, address=pool_addr)
-    assert len(log_content) > 0
+    assert len(log_content) == 0
 
     log_content = await web_api.fetch_node_log(size=5, address=pool_addr)
     assert len(log_content) == 0
 
     log_content = await web_api.fetch_node_log(size=-1, address=pool_addr)
     assert type(log_content) is str
-    assert len(log_content) > 0
+    assert len(log_content) == 0
+
+    log_file = os.environ[MARS_LOG_PATH_KEY]
+    with open(log_file, "w") as f:
+        f.write("foo bar baz")
+    log_content = await web_api.fetch_node_log(size=-1, address=pool_addr)
+    assert len(log_content) == 11
 
     await MockClusterAPI.cleanup(pool_addr)
 

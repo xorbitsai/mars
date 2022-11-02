@@ -14,3 +14,4 @@ global-exclude .DS_Store
 include versioneer.py
 include mars/_version.py
 global-exclude conftest.py
+include mars/deploy/oscar/file-logging.conf

@@ -11,22 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
 import os
 import tempfile
 
 import pytest
 
-from ..file_logger import FileLoggerActor
 from .... import oscar as mo
 from ....constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
 from ....utils import clean_mars_tmp_dir
+from ..file_logger import FileLoggerActor
 
 full_content = "qwert\nasdfg\nzxcvb\nyuiop\nhjkl;\nnm,./"
 
 
 @pytest.fixture
 async def actor_pool():
+    # prepare
+    mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
+    _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
+    os.environ[MARS_LOG_PATH_KEY] = file_path
     pool = await mo.create_actor_pool("127.0.0.1", n_process=0)
     async with pool:
         yield pool
@@ -36,36 +39,15 @@ async def actor_pool():
 
 
 @pytest.mark.asyncio
-async def test_file_logger_with_env(actor_pool, caplog):
-    # prepare
-    mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
-    _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
-    os.environ[MARS_LOG_PATH_KEY] = file_path
-
+async def test_file_logger(actor_pool):
     pool_addr = actor_pool.external_address
-    _ = await mo.create_actor(
+    logger_ref = await mo.create_actor(
         FileLoggerActor,
         uid=FileLoggerActor.default_uid(),
         address=pool_addr,
     )
-    assert len(caplog.text) == 0
-
-
-@pytest.mark.asyncio
-async def test_file_logger_without_env(actor_pool, caplog):
-    pool_addr = actor_pool.external_address
-    with caplog.at_level(logging.WARN):
-        logger_ref = await mo.create_actor(
-            FileLoggerActor,
-            uid=FileLoggerActor.default_uid(),
-            address=pool_addr,
-        )
 
     filename = os.environ.get(MARS_LOG_PATH_KEY)
-    assert filename is not None
-    assert os.path.exists(filename)
-    assert os.path.basename(filename).startswith(MARS_LOG_PREFIX)
-    assert os.path.basename(os.path.dirname(filename)).startswith(MARS_TMP_DIR_PREFIX)
     with open(filename, "w", newline="\n") as f:
         f.write(full_content)
 
