@@ -23,6 +23,7 @@ from .base.get_dummies import get_dummies
 from .base.melt import melt
 from .base.qcut import qcut
 from .base.to_numeric import to_numeric
+from .base.value_counts import value_counts
 from .contrib.raydataset import to_ray_mldataset, to_ray_dataset
 from .datasource.from_tensor import dataframe_from_tensor, series_from_tensor
 from .datasource.from_index import series_from_index
@@ -75,11 +76,43 @@ del (
 del DataFrameFetch, DataFrameFetchShuffle
 
 # noinspection PyUnresolvedReferences
-from ..core import ExecutableTuple
 from .arrays import ArrowStringDtype, ArrowStringArray, ArrowListDtype, ArrowListArray
+from .core import (
+    CategoricalIndex,
+    DatetimeIndex,
+    Float64Index,
+    IntervalIndex,
+    MultiIndex,
+    PeriodIndex,
+    RangeIndex,
+    TimedeltaIndex,
+    UInt64Index,
+)
 
 # noinspection PyUnresolvedReferences
-from pandas import Timedelta, Timestamp, offsets, NaT, Interval, DateOffset
+from pandas import (
+    Timedelta,
+    Timestamp,
+    offsets,
+    NaT,
+    Interval,
+    DateOffset,
+    BooleanDtype,
+    CategoricalDtype,
+    DatetimeTZDtype,
+    Int8Dtype,
+    Int16Dtype,
+    Int32Dtype,
+    Int64Dtype,
+    IntervalDtype,
+    SparseDtype,
+    StringDtype,
+    UInt8Dtype,
+    UInt16Dtype,
+    UInt32Dtype,
+    UInt64Dtype,
+    PeriodDtype,
+)
 
 try:
     from pandas import NA, NamedAgg
