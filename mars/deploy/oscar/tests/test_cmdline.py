@@ -30,7 +30,6 @@ import psutil
 import pytest
 
 from .... import tensor as mt
-from ....constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
 from ....lib.aio import new_isolation, get_isolation, stop_isolation
 from ....services import NodeRole
 from ....services.cluster import ClusterAPI
@@ -325,20 +324,16 @@ def test_parse_no_log_dir(init_app):
 
     with pytest.raises(KeyError):
         try:
-            app._set_log_file_env()
+            app._set_log_dir()
         except ValueError:
             pytest.fail()
 
     _ = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
     assert app.config["cluster"]
     assert not app.config["cluster"]["log_dir"]
-    assert not os.environ.get(MARS_LOG_PATH_KEY)
-    app._set_log_file_env()
-    filename = os.environ.get(MARS_LOG_PATH_KEY)
-    assert filename
-    path, file = os.path.split(filename)
-    assert file.startswith(MARS_LOG_PREFIX)
-    assert os.path.basename(path).startswith(MARS_TMP_DIR_PREFIX)
+    app._set_log_dir()
+    assert app.logging_conf["from_cmd"] is True
+    assert not app.logging_conf["log_dir"]
 
 
 def test_parse_log_dir(init_app):
@@ -347,28 +342,18 @@ def test_parse_log_dir(init_app):
     _ = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
     app.config["cluster"]["log_dir"] = log_dir
     assert os.path.exists(app.config["cluster"]["log_dir"])
-    app._set_log_file_env()
-    filename = os.environ.get(MARS_LOG_PATH_KEY)
-    assert filename is not None
-    assert os.path.exists(filename)
+    app._set_log_dir()
+    assert app.logging_conf["log_dir"] == log_dir
 
 
 def test_config_logging(init_app):
-    from ..file_logging_handler import FileLoggingHandler
-
     app, parser = init_app
     app.args = app.parse_args(parser, ["--supervisors", "127.0.0.1"])
     app.config_logging()
-    cnt = 0
-    file_handler = None
-    for handler in logging.getLogger().handlers:
-        if isinstance(handler, FileLoggingHandler):
-            cnt += 1
-            file_handler = handler
-    assert cnt == 1
-    assert file_handler is not None
-    assert file_handler.level == logging.INFO
-    assert file_handler.baseFilename == os.environ.get(MARS_LOG_PATH_KEY)
+    expected_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "file-logging.conf"
+    )
+    assert app.logging_conf["file"] == expected_path
 
 
 def test_parse_third_party_modules():

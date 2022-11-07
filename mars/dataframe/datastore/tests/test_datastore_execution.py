@@ -183,11 +183,6 @@ def test_to_parquet_arrow_execution(setup):
         result = result.sort_index()
         pd.testing.assert_frame_equal(result, raw)
 
-        read_df = md.read_parquet(path)
-        result = read_df.execute().fetch()
-        result = result.sort_index()
-        pd.testing.assert_frame_equal(result, raw)
-
         # test read_parquet then to_parquet
         read_df = md.read_parquet(path)
         read_df.to_parquet(path).execute()

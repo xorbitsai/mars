@@ -13,10 +13,9 @@
 # limitations under the License.
 import logging
 import os
-import tempfile
 
 from ... import oscar as mo
-from ...constants import MARS_LOG_PATH_KEY, MARS_LOG_PREFIX, MARS_TMP_DIR_PREFIX
+from ...constants import MARS_LOG_PATH_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -29,28 +28,25 @@ class FileLoggerActor(mo.Actor):
 
     def __init__(self):
         file_path = os.environ.get(MARS_LOG_PATH_KEY)
-        # other situations: start cluster not from cmdline
-        if file_path is None:
-            logger.debug("Env {0} is not set!".format(MARS_LOG_PATH_KEY))
-            mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
-            _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
-            os.environ[MARS_LOG_PATH_KEY] = file_path
         self._log_filename = file_path
 
-    def fetch_logs(self, size: int) -> str:
+    def fetch_logs(self, size: int, offset: int) -> str:
         """
         Externally exposed interface.
 
         Parameters
         ----------
         size
+        offset
 
         Returns
         -------
 
         """
-
-        content = self._get_n_bytes_tail_file(size)
+        if size != -1:
+            content = self._get_n_bytes_tail_file(size)
+        else:
+            content = self._get_n_bytes_from_pos(10 * 1024 * 1024, offset)
         return content
 
     def _get_n_bytes_tail_file(self, bytes_num: int) -> str:
@@ -65,11 +61,8 @@ class FileLoggerActor(mo.Actor):
         -------
 
         """
-        if bytes_num != -1:
-            f_size = os.stat(self._log_filename).st_size
-            target = f_size - bytes_num if f_size > bytes_num else 0
-        else:
-            target = 0
+        f_size = os.stat(self._log_filename).st_size
+        target = f_size - bytes_num if f_size > bytes_num else 0
         with open(self._log_filename) as f:
             f.seek(target)
             if target == 0:
@@ -78,4 +71,21 @@ class FileLoggerActor(mo.Actor):
                 f.readline()
                 res = f.read()
 
+        return res
+
+    def _get_n_bytes_from_pos(self, size: int, offset: int) -> str:
+        """
+        Read n bytes from a position.
+        Parameters
+        ----------
+        size
+        offset
+
+        Returns
+        -------
+
+        """
+        with open(self._log_filename) as f:
+            f.seek(offset)
+            res = f.read(size)
         return res
