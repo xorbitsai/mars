@@ -65,6 +65,7 @@ register_fetch_class(OutputType.dataframe, DataFrameFetch, DataFrameFetchShuffle
 register_fetch_class(
     OutputType.dataframe_groupby, DataFrameFetch, DataFrameFetchShuffle
 )
+register_fetch_class(OutputType.df_or_series, DataFrameFetch, DataFrameFetchShuffle)
 register_fetch_class(OutputType.series, DataFrameFetch, DataFrameFetchShuffle)
 register_fetch_class(OutputType.series_groupby, DataFrameFetch, DataFrameFetchShuffle)
 register_fetch_class(OutputType.index, DataFrameFetch, DataFrameFetchShuffle)

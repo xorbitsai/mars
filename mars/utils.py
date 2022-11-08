@@ -837,7 +837,7 @@ def calc_nsplits(chunk_idx_to_shape: Dict[Tuple[int], Tuple[int]]) -> Tuple[Tupl
 def has_unknown_shape(*tiled_tileables: TileableType) -> bool:
     for tileable in tiled_tileables:
         if getattr(tileable, "shape", None) is None:
-            continue
+            return True
         if any(pd.isnull(s) for s in tileable.shape):
             return True
         if any(pd.isnull(s) for s in itertools.chain(*tileable.nsplits)):
