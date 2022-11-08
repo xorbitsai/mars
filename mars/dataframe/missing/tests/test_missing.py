@@ -19,11 +19,20 @@ import pandas as pd
 import pytest
 
 from .... import dataframe as md
+from .... import tensor as mt
 from ....core import tile
 from ....core.operand import OperandStage
 from ....utils import pd_release_version
 
 _drop_na_enable_no_default = pd_release_version[:2] >= (1, 5)
+
+
+def test_isna_scalars():
+    assert False == md.isna("dog")
+    assert True == md.isna(None)
+    assert True == md.isna(md.NA)
+    assert True == md.isna(md.NaT)
+    assert True == md.isna(mt.nan)
 
 
 def test_fill_na():

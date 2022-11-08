@@ -15,7 +15,9 @@
 import numpy as np
 import pandas as pd
 
+from ... import dataframe as md
 from ... import opcodes
+from ... import tensor as mt
 from ...config import options
 from ...core import OutputType
 from ...serialization.serializables import BoolField
@@ -24,6 +26,7 @@ from ..operands import (
     DataFrameOperandMixin,
     DATAFRAME_TYPE,
     SERIES_TYPE,
+    TENSOR_TYPE,
 )
 
 
@@ -57,8 +60,13 @@ class DataFrameCheckNA(DataFrameOperand, DataFrameOperandMixin):
             self.output_types = [OutputType.dataframe]
         elif isinstance(df, SERIES_TYPE):
             self.output_types = [OutputType.series]
-        else:
+        elif isinstance(df, TENSOR_TYPE):
             self.output_types = [OutputType.tensor]
+        else:
+            # all the other types are treated as scalar, including pandas dataframe.
+            if df is None or df is md.NA or df is md.NaT or df is mt.nan:
+                return True
+            return False
 
         params = df.params.copy()
         if self.output_types[0] == OutputType.dataframe:
