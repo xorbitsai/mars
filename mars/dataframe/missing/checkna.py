@@ -25,6 +25,7 @@ from ..operands import (
     DataFrameOperand,
     DataFrameOperandMixin,
     DATAFRAME_TYPE,
+    INDEX_TYPE,
     SERIES_TYPE,
     TENSOR_TYPE,
 )
@@ -60,7 +61,7 @@ class DataFrameCheckNA(DataFrameOperand, DataFrameOperandMixin):
             self.output_types = [OutputType.dataframe]
         elif isinstance(df, SERIES_TYPE):
             self.output_types = [OutputType.series]
-        elif isinstance(df, TENSOR_TYPE):
+        elif isinstance(df, TENSOR_TYPE) or isinstance(df, INDEX_TYPE):
             self.output_types = [OutputType.tensor]
         else:
             # all the other types are treated as scalar, including pandas dataframe.
