@@ -14,6 +14,7 @@
 
 import asyncio
 import concurrent.futures as futures
+import configparser
 import contextlib
 import logging.config
 import multiprocessing
@@ -216,7 +217,9 @@ class MainActorPool(MainActorPoolBase):
             signal.signal(signal.SIGINT, lambda *_: None)
 
         logging_conf = conf["logging_conf"] or {}
-        if logging_conf.get("file"):
+        if isinstance(logging_conf, configparser.RawConfigParser):
+            logging.config.fileConfig(logging_conf)
+        elif logging_conf.get("file"):
             logging.config.fileConfig(logging_conf["file"])
         elif logging_conf.get("level"):
             logging.getLogger("__main__").setLevel(logging_conf["level"])
