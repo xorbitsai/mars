@@ -64,7 +64,7 @@ from ..utils import (
     ceildiv,
     tokenize,
     estimate_pandas_size,
-    calc_nsplits
+    calc_nsplits,
 )
 from .utils import fetch_corner_data, ReprSeries, parse_index, merge_index_value
 from ..tensor import statistics
@@ -3015,9 +3015,9 @@ class Categorical(HasShapeTileable, _ToPandasMixin):
         return super().__hash__()
 
 
-class DFOrSeriesChunkData(ChunkData):
+class DataFrameOrSeriesChunkData(ChunkData):
     __slots__ = ()
-    type_name = "DFOrSeries"
+    type_name = "DataFrameOrSeries"
 
     _collapse_axis = Int8Field("collapse_axis")
     _data_type = StringField("data_type")
@@ -3051,52 +3051,41 @@ class DFOrSeriesChunkData(ChunkData):
     @params.setter
     def params(self, new_params: Dict[str, Any]):
         self._data_type = new_params.get("data_type")
-        if self._data_type == "series":
+        if self._collapse_axis is not None and self._data_type == "series":
             self._index = (self._index[1 - self._collapse_axis],)
+        if self._collapse_axis is None and self._data_type == "dataframe":
+            self._index = (self._index[0], 0)
         self._data_params = {k: v for k, v in new_params.get("data_params", {}).items()}
 
     def get_params_from_data(self, data: Any) -> Dict[str, Any]:
-        # TODO
         if isinstance(data, pd.DataFrame):
             return {
                 "data_type": "dataframe",
                 "data_params": DataFrameChunkData.get_params_from_data(data),
             }
-        elif isinstance(data, pd.Series):
+        else:
             return {
                 "data_type": "series",
                 "data_params": SeriesChunkData.get_params_from_data(data),
             }
-        else:
-            raise NotImplementedError
 
 
-class DFOrSeriesChunk(Chunk):
+class DataFrameOrSeriesChunk(Chunk):
     __slots__ = ()
-    _allow_data_type_ = (DFOrSeriesChunkData,)
-    type_name = "DFOrSeries"
+    _allow_data_type_ = (DataFrameOrSeriesChunkData,)
+    type_name = "DataFrameOrSeries"
 
 
-class DFOrSeriesData(HasShapeTileableData, _ToPandasMixin):
-    __slots__ = ("_dtypes_value",)
-    _index_value = ReferenceField(
-        "index_value", IndexValue, on_deserialize=_on_deserialize_index_value
-    )
+class DataFrameOrSeriesData(HasShapeTileableData, _ToPandasMixin):
+    __slots__ = ()
     _chunks = ListField(
         "chunks",
-        FieldTypes.reference(DFOrSeriesChunkData),
+        FieldTypes.reference(DataFrameOrSeriesChunkData),
         on_serialize=lambda x: [it.data for it in x] if x is not None else x,
-        on_deserialize=lambda x: [DFOrSeriesChunk(it) for it in x]
+        on_deserialize=lambda x: [DataFrameOrSeriesChunk(it) for it in x]
         if x is not None
         else x,
     )
-    # _name = AnyField("name")
-    # _data_type = StringField("data_type")
-    # # series
-    # _dtype = DataTypeField("dtype")
-    # # dataframe
-    # _dtypes = SeriesField("dtypes")
-    # _columns_value = ReferenceField("columns_value", IndexValue)
 
     _data_type = StringField("data_type")
     _data_params = DictField("data_params")
@@ -3105,31 +3094,16 @@ class DFOrSeriesData(HasShapeTileableData, _ToPandasMixin):
         self,
         op=None,
         chunks=None,
-        data_type=None,
-        data_params=dict(),
-        index_value=None,
-        # name=None,
         nsplits=None,
-        # dtype=None,
-        # dtypes=None,
-        # dtypes_value=None,
-        # columns_value=None,
+        data_type=None,
+        data_params=None,
         **kw,
     ):
-        # self._name = name
-        # self._data_type = data_type
         self._data_type = data_type
-        self._data_params = data_params
-        # # series
-        # self._dtype = dtype
-        # # dataframe
-        # self._dtypes = dtypes
-        # self._dtypes_value = dtypes_value
-        # self._columns_value = columns_value
+        self._data_params = data_params or dict()
         super().__init__(
             _op=op,
             _chunks=chunks,
-            _index_value=index_value,
             _nsplits=nsplits,
             **kw,
         )
@@ -3137,18 +3111,6 @@ class DFOrSeriesData(HasShapeTileableData, _ToPandasMixin):
     @property
     def index_value(self):
         return self._index_value
-
-    # @property
-    # def dtype(self):
-    #     return self._dtype
-    #
-    # @property
-    # def dtypes(self):
-    #     return self._dtypes
-    #
-    # @property
-    # def columns_value(self):
-    #     return self._columns_value
 
     @property
     def data_type(self):
@@ -3160,100 +3122,49 @@ class DFOrSeriesData(HasShapeTileableData, _ToPandasMixin):
 
     @property
     def params(self) -> Dict[str, Any]:
-        return {
-            "data_type": self._data_type,
-            "data_params": self._data_params
-            # "index_value": self._index_value,
-            # "shape": self.shape,
-            # "name": self._name,
-            # "dtype": self._dtype,
-            # "dtypes": self._dtypes,
-            # "dtypes_value": self._dtypes_value,
-            # "columns_value": self._columns_value
-        }
+        return {"data_type": self._data_type, "data_params": self._data_params}
 
     @params.setter
     def params(self, new_params: Dict[str, Any]):
-
         self._data_type = new_params.get("data_type")
-        # if self._data_type == "series":
-        #     self._index = (self._index[1 - self._collapse_axis],)
         self._data_params = {k: v for k, v in new_params.get("data_params", {}).items()}
-
-        # self._index_value = new_params.get("index_value", None)
-        # self._shape = new_params.get("shape", None)
-        # self._name = new_params.get("name", None)
-        # if self._data_type is None:
-        #     self._data_type = new_params.get("data_type", None)
-        # if self._nsplits is None:
-        #     self._nsplits = new_params.get("nsplits", None)
-        #
-        # # series
-        # self._dtype = new_params.get("dtype", None)
-        # # dataframe
-        # self._dtypes = new_params.get("dtypes", None)
-        # self._dtypes_value = new_params.get("dtypes_value", None)
-        # self._columns_value = new_params.get("columns_value", None)
 
     def refresh_params(self):
         nsplits = calc_nsplits({c.index: c.shape for c in self.chunks})
         shape = tuple(sum(ns) for ns in nsplits)
 
         data_params = dict()
-        data_params['nsplits'] = nsplits
-        data_params['shape'] = shape
+        data_params["nsplits"] = nsplits
+        data_params["shape"] = shape
 
         self._data_type = self._chunks[0]._data_type
         if self.data_type == "dataframe":
             all_dtypes = [c.dtypes_value.value for c in self.chunks if c.index[0] == 0]
             dtypes = pd.concat(all_dtypes)
             data_params["dtypes"] = dtypes
-            # tileable._dtypes = dtypes
             columns_values = parse_index(dtypes.index, store_data=True)
             data_params["columns_value"] = columns_values
-            data_params["dtypes_value"] = DtypesValue(key=tokenize(dtypes), value=dtypes)
-            # tileable._columns_value = columns_values
-            # tileable._dtypes_value = DtypesValue(key=tokenize(dtypes), value=dtypes)
+            data_params["dtypes_value"] = DtypesValue(
+                key=tokenize(dtypes), value=dtypes
+            )
         else:
-            data_params['dtype'] = self.chunks[0].dtype
-            data_params['name'] = self.chunks[0].name
-            # if self._dtype is None:
-            #     self._dtype = self.chunks[0].dtype
-            # if self._name is None:
-            #     self._name = self.chunks[0].name
+            data_params["dtype"] = self.chunks[0].dtype
+            data_params["name"] = self.chunks[0].name
         self._data_params.update(data_params)
 
-        # shape = tuple(sum(ns) for ns in nsplits)
-        # tileable._nsplits = nsplits
-        # tileable._shape = shape
 
-
-
-
-        # refresh_tileable_shape(self)
-        # refresh_index_value(self)
-        # self._data_type = self._chunks[0]._data_type
-        # if self.data_type == "dataframe":
-        #     refresh_dtypes(self)
-        # else:
-        #     if self._dtype is None:
-        #         self._dtype = self.chunks[0].dtype
-        #     if self._name is None:
-        #         self._name = self.chunks[0].name
-
-
-class DFOrSeries(HasShapeTileable, _ToPandasMixin):
+class DataFrameOrSeries(HasShapeTileable, _ToPandasMixin):
     __slots__ = ()
-    _allow_data_type_ = (DFOrSeriesData,)
-    type_name = "DFOrSeries"
+    _allow_data_type_ = (DataFrameOrSeriesData,)
+    type_name = "DataFrameOrSeries"
 
 
 INDEX_TYPE = (Index, IndexData)
 INDEX_CHUNK_TYPE = (IndexChunk, IndexChunkData)
 SERIES_TYPE = (Series, SeriesData)
 SERIES_CHUNK_TYPE = (SeriesChunk, SeriesChunkData)
-DF_OR_SERIES_TYPE = (DFOrSeries, DFOrSeriesData)
-DF_OR_SERIES_CHUNK_TYPE = (DFOrSeriesChunk, DFOrSeriesChunkData)
+DATAFRAME_OR_SERIES_TYPE = (DataFrameOrSeries, DataFrameOrSeriesData)
+DATAFRAME_OR_SERIES_CHUNK_TYPE = (DataFrameOrSeriesChunk, DataFrameOrSeriesChunkData)
 DATAFRAME_TYPE = (DataFrame, DataFrameData)
 DATAFRAME_CHUNK_TYPE = (DataFrameChunk, DataFrameChunkData)
 DATAFRAME_GROUPBY_TYPE = (DataFrameGroupBy, DataFrameGroupByData)
@@ -3278,7 +3189,7 @@ CHUNK_TYPE = (
 register_output_types(OutputType.dataframe, DATAFRAME_TYPE, DATAFRAME_CHUNK_TYPE)
 register_output_types(OutputType.series, SERIES_TYPE, SERIES_CHUNK_TYPE)
 register_output_types(
-    OutputType.df_or_series, DF_OR_SERIES_TYPE, DF_OR_SERIES_CHUNK_TYPE
+    OutputType.df_or_series, DATAFRAME_OR_SERIES_TYPE, DATAFRAME_OR_SERIES_CHUNK_TYPE
 )
 register_output_types(OutputType.index, INDEX_TYPE, INDEX_CHUNK_TYPE)
 register_output_types(OutputType.categorical, CATEGORICAL_TYPE, CATEGORICAL_CHUNK_TYPE)

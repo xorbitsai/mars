@@ -245,7 +245,6 @@ class ApplyOperand(
                 new_op = op.copy().reset_key()
                 new_op.tileable_op_key = op.key
                 chunks.append(new_op.new_chunk([c], collapse_axis=axis, index=c.index))
-            # new_nsplits = (np.nan,) * len(chunks
             new_nsplits = None
         elif out_df.ndim == 2:
             for c in in_df.chunks:
@@ -312,11 +311,15 @@ class ApplyOperand(
     def _tile_series(cls, op):
         in_series = op.inputs[0]
         out_series = op.outputs[0]
+        output_type = op.output_types[0] if op.output_types else None
 
         chunks = []
         for c in in_series.chunks:
             new_op = op.copy().reset_key()
             new_op.tileable_op_key = op.key
+            if output_type == OutputType.df_or_series:
+                chunks.append(new_op.new_chunk([c], collapse_axis=None, index=c.index))
+                continue
             kw = c.params.copy()
             if out_series.ndim == 1:
                 kw["dtype"] = out_series.dtype
@@ -329,8 +332,11 @@ class ApplyOperand(
 
         new_op = op.copy()
         kw = out_series.params.copy()
-        kw.update(dict(chunks=chunks, nsplits=in_series.nsplits))
-        if out_series.ndim == 2:
+        if output_type == OutputType.df_or_series:
+            kw.update(dict(chunks=chunks, nsplits=None))
+        else:
+            kw.update(dict(chunks=chunks, nsplits=in_series.nsplits))
+        if output_type != OutputType.df_or_series and out_series.ndim == 2:
             kw["nsplits"] = (in_series.nsplits[0], (out_series.shape[1],))
             kw["columns_value"] = out_series.columns_value
         return new_op.new_tileables(op.inputs, **kw)
@@ -398,16 +404,8 @@ class ApplyOperand(
         )
         return dtypes, index_value
 
-    def _call_df_or_series(self, df, dtypes=None, dtype=None, name=None, index=None):
-        index_value = parse_index(None, (df.key, df.index_value.key))
-        return self.new_df_or_series(
-            [df],
-            dtypes=dtypes,
-            dtype=dtype,
-            name=name,
-            index=index,
-            index_value=index_value,
-        )
+    def _call_df_or_series(self, df):
+        return self.new_df_or_series([df])
 
     def _call_dataframe(self, df, dtypes=None, dtype=None, name=None, index=None):
         # for backward compatibility
@@ -541,10 +539,8 @@ class ApplyOperand(
         dtype = make_dtype(dtype)
         self._axis = validate_axis(axis, df_or_series)
 
-        if self.output_type is not None and self.output_type == OutputType.df_or_series:
-            return self._call_df_or_series(
-                df_or_series, dtypes=dtypes, dtype=dtype, name=name, index=index
-            )
+        if self.output_type == OutputType.df_or_series:
+            return self._call_df_or_series(df_or_series)
 
         if df_or_series.op.output_types[0] == OutputType.dataframe:
             return self._call_dataframe(

@@ -33,8 +33,8 @@ from ...dataframe.core import (
     SERIES_GROUPBY_CHUNK_TYPE,
     CATEGORICAL_TYPE,
     CATEGORICAL_CHUNK_TYPE,
-    DF_OR_SERIES_TYPE,
-    DF_OR_SERIES_CHUNK_TYPE,
+    DATAFRAME_OR_SERIES_TYPE,
+    DATAFRAME_OR_SERIES_CHUNK_TYPE,
 )
 from ...tensor.core import TensorOrder, TENSOR_TYPE, TENSOR_CHUNK_TYPE
 from ...utils import dataslots
@@ -196,18 +196,18 @@ class ObjectChunkMeta(_ChunkMeta):
     pass
 
 
-@register_meta_type(DF_OR_SERIES_TYPE)
+@register_meta_type(DATAFRAME_OR_SERIES_TYPE)
 @dataslots
 @dataclass
-class DFOrSeriesMeta(_TileableMeta):
+class DataFrameOrSeriesMeta(_TileableMeta):
     data_type: str = None
     data_params: Dict[str, Any] = None
 
 
-@register_meta_type(DF_OR_SERIES_CHUNK_TYPE)
+@register_meta_type(DATAFRAME_OR_SERIES_CHUNK_TYPE)
 @dataslots
 @dataclass
-class DFOrSeriesChunkMeta(_ChunkMeta):
+class DataFrameOrSeriesChunkMeta(_ChunkMeta):
     collapse_axis: int = None
     data_type: str = None
     data_params: Dict[str, Any] = None
