@@ -3057,7 +3057,8 @@ class DataFrameOrSeriesChunkData(ChunkData):
             self._index = (self._index[0], 0)
         self._data_params = {k: v for k, v in new_params.get("data_params", {}).items()}
 
-    def get_params_from_data(self, data: Any) -> Dict[str, Any]:
+    @classmethod
+    def get_params_from_data(cls, data: Any) -> Dict[str, Any]:
         if isinstance(data, pd.DataFrame):
             return {
                 "data_type": "dataframe",
