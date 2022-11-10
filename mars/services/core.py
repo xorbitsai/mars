@@ -20,8 +20,6 @@ import inspect
 import warnings
 from typing import Dict, Iterable, List, Union
 
-from ..utils import clean_mars_tmp_dir
-
 _ModulesType = Union[List, str, None]
 
 
@@ -187,9 +185,6 @@ async def stop_services(node_role: NodeRole, config: Dict, address: str = None):
         await asyncio.gather(*[inst.stop() for inst in instances])
 
     AbstractService.clear()
-
-    # clean mars temp dir
-    clean_mars_tmp_dir()
 
 
 async def create_service_session(
