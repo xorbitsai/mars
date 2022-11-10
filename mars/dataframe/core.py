@@ -3036,10 +3036,6 @@ class DataFrameOrSeriesChunkData(ChunkData):
         raise AttributeError(f"'{type(self)}' object has no attribute '{item}'")
 
     @property
-    def ndim(self) -> int:
-        return (self._data_type == "dataframe") + 1
-
-    @property
     def params(self) -> Dict[str, Any]:
         return {
             "collapse_axis": self._collapse_axis,
@@ -3108,10 +3104,6 @@ class DataFrameOrSeriesData(HasShapeTileableData, _ToPandasMixin):
             _nsplits=nsplits,
             **kw,
         )
-
-    @property
-    def index_value(self):
-        return self._index_value
 
     @property
     def data_type(self):
