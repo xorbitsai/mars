@@ -98,7 +98,7 @@ class ApplyOperand(
     ):
         if output_type:
             kw["_output_types"] = [output_type]
-            self.output_type = output_type
+        self.output_type = output_type
         super().__init__(
             _func=func,
             _axis=axis,

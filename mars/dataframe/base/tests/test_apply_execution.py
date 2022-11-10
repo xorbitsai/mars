@@ -24,7 +24,7 @@ def test_dataframe_apply_execution(setup):
     mdf = md.DataFrame(df)
 
     apply_func = lambda x: 20 if x[0] else 10
-    with pytest.raises(AttributeError):
+    with pytest.raises(TypeError):
         res = mdf.apply(apply_func)
 
     res = mdf.apply(apply_func, output_type="df_or_series", axis=1).execute()
