@@ -58,7 +58,7 @@ def _parse_file_logging_config(
         if section in all_sections:
             config[section]["level"] = level.upper() if level else "INFO"
 
-    config["handler_file_handler"]["args"] = fr"('{log_path}',)"
+    config["handler_file_handler"]["args"] = rf"('{log_path}',)"
     if formatter:
         format_section = "formatter_formatter"
         config[format_section]["format"] = formatter
@@ -79,9 +79,9 @@ def _config_logging(**kwargs):
     # web=False usually means it is a test environment.
     if not web:
         return
-    if 'logging_conf' not in kwargs:
+    if "logging_conf" not in kwargs:
         return
-    config = kwargs['logging_conf']
+    config = kwargs["logging_conf"]
     from_cmd = config.get("from_cmd", False)
     log_dir = config.get("log_dir", None)
     log_conf_file = config.get("file", None)
@@ -91,7 +91,9 @@ def _config_logging(**kwargs):
         os.path.dirname(os.path.abspath(__file__)), "file-logging.conf"
     )
     # default config, then create a temp file
-    if (os.environ.get(MARS_LOG_PATH_KEY, None)) is None:
+    if (os.environ.get(MARS_LOG_PATH_KEY, None)) is None or (
+        not os.path.exists(os.environ[MARS_LOG_PATH_KEY])
+    ):
         if log_dir is None:
             mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
         else:
