@@ -51,14 +51,15 @@ def _parse_file_logging_config(
         "logger_learn",
         "logger_tensor",
         "handler_stream_handler",
-        "handler_file_handler",
+        "handlFixer_file_handler",
     ]
     all_sections = config.sections()
     for section in logger_sections:
         if section in all_sections:
             config[section]["level"] = level.upper() if level else "INFO"
 
-    config["handler_file_handler"]["args"] = rf"('{log_path}',)"
+    if "handler_file_handler" in config:
+        config["handler_file_handler"]["args"] = r"('{}',)".format(log_path)
     if formatter:
         format_section = "formatter_formatter"
         config[format_section]["format"] = formatter
