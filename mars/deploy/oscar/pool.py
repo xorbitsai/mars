@@ -14,6 +14,7 @@
 import configparser
 import logging
 import os
+import sys
 import tempfile
 from typing import Dict, List
 
@@ -51,7 +52,7 @@ def _parse_file_logging_config(
         "logger_learn",
         "logger_tensor",
         "handler_stream_handler",
-        "handlFixer_file_handler",
+        "handler_file_handler",
     ]
     all_sections = config.sections()
     for section in logger_sections:
@@ -59,7 +60,9 @@ def _parse_file_logging_config(
             config[section]["level"] = level.upper() if level else "INFO"
 
     if "handler_file_handler" in config:
-        config["handler_file_handler"]["args"] = r"('{}',)".format(log_path)
+        if sys.platform.startswith("win"):
+            log_path = log_path.replace("\\", '/')
+        config["handler_file_handler"]["args"] = rf"('{log_path}',)"
     if formatter:
         format_section = "formatter_formatter"
         config[format_section]["format"] = formatter
