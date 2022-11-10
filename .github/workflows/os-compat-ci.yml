@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macOS-latest, windows-latest]
-        python-version: [3.7, 3.8]
+        python-version: [3.9]
 
     steps:
     - name: Check out code
@@ -47,8 +47,6 @@ jobs:
         source ./ci/rewrite-cov-config.sh
 
         pip install numpy scipy cython oss2
-        if [[ $UNAME == "windows" ]]; then
-          pip install "pyarrow<10"
         fi
         pip install -e ".[dev,extra]"
         pip install virtualenv flaky
