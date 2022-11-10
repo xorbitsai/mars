@@ -248,6 +248,8 @@ class LocalCluster:
             modules=supervisor_modules,
             subprocess_start_method=self._subprocess_start_method,
             metrics=self._config.get("metrics", {}),
+            # passing logging conf to config logging when create pools
+            logging_conf={},
         )
         self.supervisor_address = self._supervisor_pool.external_address
 
@@ -262,6 +264,8 @@ class LocalCluster:
                 modules=worker_modules,
                 subprocess_start_method=self._subprocess_start_method,
                 metrics=self._config.get("metrics", {}),
+                # passing logging conf to config logging when create pools
+                logging_conf={},
             )
             self._worker_pools.append(worker_pool)
 

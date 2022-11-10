@@ -46,7 +46,7 @@ def init():
 
 def test_parse_file_logging_config(init):
     fp, sections = init
-    log_path = 'mock_path'
+    log_path = "mock_path"
     config = _parse_file_logging_config(fp, log_path, "FATAL")
     assert config["handler_stream_handler"]["level"] == "WARN"
     assert config["handler_stream_handler"].get("formatter") is None
