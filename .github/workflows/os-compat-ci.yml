@@ -47,7 +47,6 @@ jobs:
         source ./ci/rewrite-cov-config.sh
 
         pip install numpy scipy cython oss2
-        fi
         pip install -e ".[dev,extra]"
         pip install virtualenv flaky
         conda list -n test
