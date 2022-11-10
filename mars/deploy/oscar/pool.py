@@ -61,7 +61,7 @@ def _parse_file_logging_config(
 
     if "handler_file_handler" in config:
         if sys.platform.startswith("win"):
-            log_path = log_path.replace("\\", '/')
+            log_path = log_path.replace("\\", "/")
         config["handler_file_handler"]["args"] = rf"('{log_path}',)"
     if formatter:
         format_section = "formatter_formatter"
