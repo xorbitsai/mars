@@ -34,7 +34,11 @@ def _need_suspend_sigint() -> bool:
 
 
 def _parse_file_logging_config(
-    file_path: str, level: str, formatter: str = None, from_cmd: bool = False
+    file_path: str,
+    log_path: str,
+    level: str,
+    formatter: str = None,
+    from_cmd: bool = False,
 ) -> configparser.RawConfigParser:
     config = configparser.RawConfigParser()
     config.read(file_path)
@@ -54,6 +58,7 @@ def _parse_file_logging_config(
         if section in all_sections:
             config[section]["level"] = level.upper() if level else "INFO"
 
+    config["handler_file_handler"]["args"] = f"('{log_path}',)"
     if formatter:
         format_section = "formatter_formatter"
         config[format_section]["format"] = formatter
@@ -84,20 +89,39 @@ def _config_logging(**kwargs):
         os.path.dirname(os.path.abspath(__file__)), "file-logging.conf"
     )
     # default config, then create a temp file
-    if log_dir is None:
-        mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
+    if (os.environ.get(MARS_LOG_PATH_KEY, None)) is None:
+        if log_dir is None:
+            mars_tmp_dir = tempfile.mkdtemp(prefix=MARS_TMP_DIR_PREFIX)
+        else:
+            mars_tmp_dir = os.path.join(log_dir, MARS_TMP_DIR_PREFIX)
+            os.makedirs(mars_tmp_dir, exist_ok=True)
+        _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
+        os.environ[MARS_LOG_PATH_KEY] = file_path
+        logging_conf = _parse_file_logging_config(
+            logging_config_path, file_path, level, formatter, from_cmd
+        )
+        # bind user's level and format when using default log conf
+        logging.config.fileConfig(
+            logging_conf,
+            disable_existing_loggers=False,
+        )
+        logger.debug("Use logging config file at %s", logging_config_path)
+        return logging_conf
     else:
-        mars_tmp_dir = os.path.join(log_dir, MARS_TMP_DIR_PREFIX)
-        os.makedirs(mars_tmp_dir, exist_ok=True)
-    _, file_path = tempfile.mkstemp(prefix=MARS_LOG_PREFIX, dir=mars_tmp_dir)
-    os.environ[MARS_LOG_PATH_KEY] = file_path
-    logging_conf = _parse_file_logging_config(
-        logging_config_path, level, formatter, from_cmd
-    )
-    # bind user's level and format when using default log conf
-    logging.config.fileConfig(logging_conf, disable_existing_loggers=False)
-    logger.debug("Use logging config file at %s", logging_config_path)
-    return logging_conf, file_path
+        logging_conf = _parse_file_logging_config(
+            logging_config_path,
+            os.environ[MARS_LOG_PATH_KEY],
+            level,
+            formatter,
+            from_cmd,
+        )
+        logging.config.fileConfig(
+            logging_conf,
+            os.environ[MARS_LOG_PATH_KEY],
+            disable_existing_loggers=False,
+        )
+        logger.debug("Use logging config file at %s", logging_config_path)
+        return logging_conf
 
 
 async def create_supervisor_actor_pool(
@@ -108,7 +132,7 @@ async def create_supervisor_actor_pool(
     subprocess_start_method: str = None,
     **kwargs,
 ):
-    logging_conf, log_path = _config_logging(**kwargs)
+    logging_conf = _config_logging(**kwargs)
     kwargs["logging_conf"] = logging_conf
     return await mo.create_actor_pool(
         address,
@@ -131,7 +155,7 @@ async def create_worker_actor_pool(
     subprocess_start_method: str = None,
     **kwargs,
 ):
-    logging_conf, log_path = _config_logging(**kwargs)
+    logging_conf = _config_logging(**kwargs)
     kwargs["logging_conf"] = logging_conf
     # TODO: support NUMA when ready
     n_process = sum(
