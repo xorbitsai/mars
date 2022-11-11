@@ -3036,6 +3036,10 @@ class DataFrameOrSeriesChunkData(ChunkData):
         raise AttributeError(f"'{type(self)}' object has no attribute '{item}'")
 
     @property
+    def ndim(self) -> int:
+        return (self._data_type == "dataframe") + 1
+
+    @property
     def params(self) -> Dict[str, Any]:
         return {
             "collapse_axis": self._collapse_axis,
@@ -3123,12 +3127,20 @@ class DataFrameOrSeriesData(HasShapeTileableData, _ToPandasMixin):
         self._data_params = {k: v for k, v in new_params.get("data_params", {}).items()}
 
     def refresh_params(self):
+        index_to_index_values = dict()
+        for chunk in self.chunks:
+            if chunk.ndim == 1:
+                index_to_index_values[chunk.index] = chunk.index_value
+            elif chunk.index[1] == 0:
+                index_to_index_values[chunk.index] = chunk.index_value
+        index_value = merge_index_value(index_to_index_values, store_data=False)
         nsplits = calc_nsplits({c.index: c.shape for c in self.chunks})
         shape = tuple(sum(ns) for ns in nsplits)
 
         data_params = dict()
         data_params["nsplits"] = nsplits
         data_params["shape"] = shape
+        data_params["index_value"] = index_value
 
         self._data_type = self._chunks[0]._data_type
         if self.data_type == "dataframe":
