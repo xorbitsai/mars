@@ -16,7 +16,7 @@ import logging
 import os
 import sys
 import tempfile
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from ... import oscar as mo
 from ...constants import MARS_TMP_DIR_PREFIX, MARS_LOG_PREFIX, MARS_LOG_PATH_KEY
@@ -34,6 +34,16 @@ def _need_suspend_sigint() -> bool:
         return False
 
 
+def _get_root_logger_level_and_format() -> Tuple[str, str]:
+    root = logging.getLogger()
+    level = logging.getLevelName(root.getEffectiveLevel())
+    if level.startswith("WARN"):
+        level = "WARN"
+    handler = root.handlers[0] if root.handlers else None
+    fmt = handler.formatter._fmt if handler else None
+    return level, fmt
+
+
 def _parse_file_logging_config(
     file_path: str,
     log_path: str,
@@ -41,9 +51,13 @@ def _parse_file_logging_config(
     formatter: str = None,
     from_cmd: bool = False,
 ) -> configparser.RawConfigParser:
+    root_level, root_fmt = _get_root_logger_level_and_format()
+    level = level or root_level
+    formatter = formatter or root_fmt
     config = configparser.RawConfigParser()
     config.read(file_path)
     logger_sections = [
+        "logger_root",
         "logger_main",
         "logger_deploy",
         "logger_oscar",
@@ -71,10 +85,9 @@ def _parse_file_logging_config(
     # If not from cmd (like ipython) and user uses its own config file,
     # need to judge that whether handler_stream_handler section is in the config.
     if not from_cmd and stream_handler_sec in all_sections:
-        # console log keeps the default level and formatter as before
+        # console log keeps the default level as root logger
         # file log on the web uses info level and the formatter in the config file
-        config[stream_handler_sec]["level"] = "WARN"
-        config[stream_handler_sec].pop("formatter")
+        config[stream_handler_sec]["level"] = root_level or "WARN"
     return config
 
 

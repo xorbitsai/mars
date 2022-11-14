@@ -49,7 +49,7 @@ def test_parse_file_logging_config(init):
     log_path = "mock_path"
     config = _parse_file_logging_config(fp, log_path, "FATAL")
     assert config["handler_stream_handler"]["level"] == "WARN"
-    assert config["handler_stream_handler"].get("formatter") is None
+    assert config["handler_stream_handler"].get("formatter") is not None
     for sec in sections:
         assert config[sec]["level"] == "FATAL"
 
@@ -59,15 +59,15 @@ def test_parse_file_logging_config(init):
 
     config = _parse_file_logging_config(fp, log_path, level="", formatter=formatter)
     for sec in sections:
-        assert config[sec]["level"] == "INFO"
+        assert config[sec]["level"] == "WARN"
 
     config = _parse_file_logging_config(
         fp, log_path, level="", formatter=formatter, from_cmd=True
     )
     for sec in sections:
-        assert config[sec]["level"] == "INFO"
+        assert config[sec]["level"] == "WARN"
 
-    assert config["handler_stream_handler"]["level"] == "INFO"
+    assert config["handler_stream_handler"]["level"] == "WARN"
     assert config["formatter_formatter"]["format"] == formatter
 
 
@@ -96,7 +96,7 @@ def test_config_logging(init, caplog):
                 file_handler = handler
         assert cnt == 1
         assert file_handler is not None
-        assert file_handler.level == logging.INFO
+        assert file_handler.level == logging.WARN
         assert file_handler.baseFilename == os.environ.get(MARS_LOG_PATH_KEY)
 
 
