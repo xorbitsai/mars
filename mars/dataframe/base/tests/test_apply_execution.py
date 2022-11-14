@@ -17,6 +17,8 @@ import pandas as pd
 import pytest
 
 from .... import dataframe as md
+from ....dataframe.core import DataFrame
+from ....dataframe.fetch.core import DataFrameFetch
 
 
 def test_dataframe_apply_execution(setup):
@@ -223,3 +225,30 @@ def test_apply_execution_with_multi_chunks(setup):
     assert "dtype" in res.data_params
     assert res.data_params["dtype"] == "float64"
     pd.testing.assert_series_equal(res.fetch(), s.apply(apply_func))
+
+
+def test_apply_ensure_data(setup):
+    df = pd.DataFrame({"c1": [1, 2, 3, 4], "c2": [5, 6, 7, 8]})
+    mdf = md.DataFrame(df, chunk_size=3)
+    apply_func = np.sqrt
+
+    r = mdf.apply(apply_func, output_type="df_or_series")
+    res = r.ensure_data()
+    assert isinstance(res, DataFrame)
+    assert isinstance(res.op, DataFrameFetch)
+    pd.testing.assert_frame_equal(res.execute().fetch(), df.apply(apply_func))
+    pd.testing.assert_frame_equal((res + 1).execute().fetch(), df.apply(apply_func) + 1)
+    pd.testing.assert_frame_equal((res * 3).execute().fetch(), df.apply(apply_func) * 3)
+
+    r = res.groupby("c1").max()
+    expected = df.apply(apply_func).groupby("c1").max()
+    pd.testing.assert_frame_equal(r.execute().fetch(), expected)
+
+    apply_func = np.mean
+    res = mdf.apply(apply_func, output_type="df_or_series", axis=1).ensure_data()
+    expected = df.apply(apply_func, axis=1)
+    pd.testing.assert_series_equal(res.execute().fetch(), expected)
+
+    res = res.to_frame(name="foo").groupby("foo")[["foo"]].max().execute()
+    expected = expected.to_frame(name="foo").groupby("foo")[["foo"]].max()
+    pd.testing.assert_frame_equal(res.fetch(), expected)
