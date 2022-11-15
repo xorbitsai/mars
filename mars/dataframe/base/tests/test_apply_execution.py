@@ -190,7 +190,10 @@ def test_series_apply_execution(setup):
     res = ms.apply(
         apply_func, args=(5,), convert_dtype=True, output_type="df_or_series"
     ).execute()
-    assert res.data_params["dtype"] == "int64"
+    assert res.dtype == "int64"
+    assert res.shape == (4,)
+    with pytest.raises(AttributeError):
+        _ = res.dtypes
     pd.testing.assert_series_equal(
         res.fetch(), s.apply(apply_func, args=(5,), convert_dtype=True)
     )
