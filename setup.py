@@ -151,7 +151,7 @@ class BuildWeb(Command):
     _web_dest_path = "mars/services/web/static/bundle.js"
     _commands = [
         ["npm", "install"],
-        ["npm", "run", "bundle"],
+        ["npm", "run", "build"],
     ]
 
     def initialize_options(self):

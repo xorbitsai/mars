@@ -28,7 +28,6 @@
   },
   "scripts": {
     "build": "webpack -w",
-    "bundle": "cross-env NODE_ENV=production npm run build",
     "lint": "npx eslint src/**"
   },
   "devDependencies": {
