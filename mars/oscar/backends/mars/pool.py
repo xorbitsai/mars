@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import asyncio
+import atexit
 import concurrent.futures as futures
+import configparser
 import contextlib
 import logging.config
 import multiprocessing
@@ -27,11 +29,18 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import List
 
-from ....utils import dataslots, ensure_coverage, reset_id_random_seed
+from ....utils import (
+    dataslots,
+    ensure_coverage,
+    reset_id_random_seed,
+    clean_mars_tmp_dir,
+)
 from ..config import ActorPoolConfig
 from ..message import CreateActorMessage
 from ..pool import MainActorPoolBase, SubActorPoolBase, _register_message_handler
 
+
+atexit.register(clean_mars_tmp_dir)
 
 _is_windows: bool = sys.platform.startswith("win")
 
@@ -216,7 +225,9 @@ class MainActorPool(MainActorPoolBase):
             signal.signal(signal.SIGINT, lambda *_: None)
 
         logging_conf = conf["logging_conf"] or {}
-        if logging_conf.get("file"):
+        if isinstance(logging_conf, configparser.RawConfigParser):
+            logging.config.fileConfig(logging_conf)
+        elif logging_conf.get("file"):
             logging.config.fileConfig(logging_conf["file"])
         elif logging_conf.get("level"):
             logging.getLogger("__main__").setLevel(logging_conf["level"])
