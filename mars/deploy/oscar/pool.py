@@ -16,7 +16,7 @@ import logging
 import os
 import sys
 import tempfile
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from ... import oscar as mo
 from ...constants import MARS_TMP_DIR_PREFIX, MARS_LOG_PREFIX, MARS_LOG_PATH_KEY
@@ -34,7 +34,7 @@ def _need_suspend_sigint() -> bool:
         return False
 
 
-def _get_root_logger_level_and_format() -> Tuple[str, str]:
+def _get_root_logger_level_and_format() -> Tuple[str, Optional[str]]:
     root = logging.getLogger()
     level = logging.getLevelName(root.getEffectiveLevel())
     if level.startswith("WARN"):
@@ -47,8 +47,8 @@ def _get_root_logger_level_and_format() -> Tuple[str, str]:
 def _parse_file_logging_config(
     file_path: str,
     log_path: str,
-    level: str,
-    formatter: str = None,
+    level: Optional[str],
+    formatter: Optional[str] = None,
     from_cmd: bool = False,
 ) -> configparser.RawConfigParser:
     root_level, root_fmt = _get_root_logger_level_and_format()
@@ -91,7 +91,7 @@ def _parse_file_logging_config(
     return config
 
 
-def _config_logging(**kwargs):
+def _config_logging(**kwargs) -> configparser.RawConfigParser:
     web: bool = kwargs.get("web", True)
     # web=False usually means it is a test environment.
     if not web:
