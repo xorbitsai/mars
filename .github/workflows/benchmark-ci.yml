@@ -53,7 +53,7 @@ jobs:
           git config --global user.email "mars_asv_benchmark@outlook.com"
           git config --global user.name "Mars ASV Benchmark"
           asv check -E existing
-          git remote add upstream https://github.com/xprobe/mars.git
+          git remote add upstream https://github.com/xprobe-inc/mars.git
           git fetch upstream
           git merge upstream/master
           asv machine --yes
