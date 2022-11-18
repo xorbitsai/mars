@@ -19,7 +19,7 @@ import pandas as pd
 from pandas.api.types import is_list_like
 
 from ... import opcodes as OperandDef
-from ...core import ENTITY_TYPE, recursive_tile
+from ...core import ENTITY_TYPE
 from ...serialization.serializables import KeyField, AnyField
 from ...tensor.core import TENSOR_TYPE
 from ..core import DATAFRAME_TYPE, SERIES_TYPE, INDEX_TYPE, OutputType
