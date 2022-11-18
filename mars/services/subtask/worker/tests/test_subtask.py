@@ -180,7 +180,7 @@ async def test_shuffle_subtask(actor_pool):
     subtask_runner: SubtaskRunnerRef = await mo.actor_ref(
         SubtaskRunnerActor.gen_uid("numa-0", 0), address=pool.external_address
     )
-    await subtask_runner.run_subtask(subtask, wait_post_run=True)
+    await subtask_runner.run_subtask(subtask)
     result = await subtask_runner.get_subtask_result()
     assert result.status == SubtaskStatus.succeeded
 
