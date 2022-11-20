@@ -17,7 +17,7 @@ import logging
 import sys
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Type, Tuple
+from typing import Any, Dict, List, Optional, Set, Type
 
 from .... import oscar as mo
 from ....core import ChunkGraph, OperandType, enter_mode, ExecutionError
@@ -27,7 +27,6 @@ from ....core.operand import (
     FetchShuffle,
     execute,
 )
-from ....lib.aio import alru_cache
 from ....metrics import Metrics
 from ....optimization.physical import optimize
 from ....typing import BandType, ChunkType
