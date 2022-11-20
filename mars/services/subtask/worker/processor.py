@@ -439,23 +439,6 @@ class SubtaskProcessor:
         # set result data size
         self.result.data_size = result_data_size
 
-    @classmethod
-    @alru_cache(cache_exceptions=False)
-    async def _gen_reducer_index_to_bands(
-        cls, session_id: str, supervisor_address: str, task_id: str, map_reduce_id: int
-    ) -> Dict[Tuple[int], BandType]:
-        task_api = await TaskAPI.create(session_id, supervisor_address)
-        map_reduce_info = await task_api.get_map_reduce_info(task_id, map_reduce_id)
-        assert len(map_reduce_info.reducer_indexes) == len(
-            map_reduce_info.reducer_bands
-        )
-        return {
-            reducer_index: band
-            for reducer_index, band in zip(
-                map_reduce_info.reducer_indexes, map_reduce_info.reducer_bands
-            )
-        }
-
     async def done(self):
         if self.result.status == SubtaskStatus.running:
             self.result.status = SubtaskStatus.succeeded
