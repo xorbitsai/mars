@@ -11,14 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from collections import UserDict
 from collections.abc import Iterable
 from functools import partial
 
 from .. import opcodes
-from ..core import ENTITY_TYPE, ChunkData, Tileable
+from ..core import ENTITY_TYPE, ChunkData, Tileable, OutputType
 from ..core.custom_log import redirect_custom_log
-from ..core.operand import ObjectOperand
+from ..core.operand import Operand
 from ..dataframe.core import DATAFRAME_TYPE, SERIES_TYPE, INDEX_TYPE
 from ..serialization.serializables import (
     FunctionField,
@@ -38,8 +39,10 @@ from ..utils import (
 )
 from .operands import RemoteOperandMixin
 
+import numpy as np
 
-class RemoteFunction(RemoteOperandMixin, ObjectOperand):
+
+class RemoteFunction(RemoteOperandMixin, Operand):
     _op_type_ = opcodes.REMOTE_FUNCATION
     _op_module_ = "remote"
 
@@ -49,6 +52,9 @@ class RemoteFunction(RemoteOperandMixin, ObjectOperand):
     retry_when_fail = BoolField("retry_when_fail")
     resolve_tileable_input = BoolField("resolve_tileable_input", default=False)
     n_output = Int32Field("n_output", default=None)
+
+    def __init__(self, output_types=None, **kwargs):
+        super().__init__(_output_types=output_types, **kwargs)
 
     @property
     def output_limit(self):
@@ -122,20 +128,33 @@ class RemoteFunction(RemoteOperandMixin, ObjectOperand):
 
         out_chunks = [list() for _ in range(len(outs))]
         chunk_kws = []
-        for i, out in enumerate(outs):
-            chunk_params = out.params
-            chunk_params["index"] = ()
+        for i, (out, out_type) in enumerate(zip(outs, op.output_types)):
+            chunk_params = out.params.copy()
             chunk_params["i"] = i
             chunk_kws.append(chunk_params)
+            if out_type == OutputType.dataframe:
+                chunk_params["index"] = (0, 0)
+                chunk_params["shape"] = (np.nan, np.nan)
+            elif out_type == OutputType.series:
+                chunk_params["index"] = (0,)
+                chunk_params["shape"] = (np.nan,)
+            else:
+                chunk_params["index"] = ()
+                chunk_params["shape"] = ()
         chunks = chunk_op.new_chunks(chunk_inputs, kws=chunk_kws)
         for i, c in enumerate(chunks):
             out_chunks[i].append(c)
 
         kws = []
-        for i, out in enumerate(outs):
-            params = out.params
+        for i, (out, out_type) in enumerate(zip(outs, op.output_types)):
+            params = out.params.copy()
             params["chunks"] = out_chunks[i]
-            params["nsplits"] = ()
+            if out_type == OutputType.dataframe:
+                params["nsplits"] = ((np.nan,), (np.nan,))
+            elif out_type == OutputType.series:
+                params["nsplits"] = ((np.nan,),)
+            else:
+                params["nsplits"] = ()
             kws.append(params)
         new_op = op.copy()
         return new_op.new_tileables(op.inputs, kws=kws)
@@ -191,6 +210,7 @@ def spawn(
     retry_when_fail=False,
     resolve_tileable_input=False,
     n_output=None,
+    output_types=None,
     **kw,
 ):
     """
@@ -210,6 +230,8 @@ def spawn(
        If True, resolve tileable inputs as values.
     n_output: int
        Count of outputs for the function
+    output_types: str or list, default "object"
+        Specify type of returned objects.
 
     Returns
     -------
@@ -292,6 +314,13 @@ def spawn(
         args = list(args)
     if kwargs is None:
         kwargs = dict()
+    if not isinstance(output_types, (list, tuple)):
+        if output_types is None:
+            output_types = OutputType.object
+        elif isinstance(output_types, str):
+            output_types = getattr(OutputType, output_types)
+        output_types = [output_types] if n_output is None else [output_types] * n_output
+
     if not isinstance(kwargs, dict):
         raise TypeError("kwargs has to be a dict")
 
@@ -302,6 +331,7 @@ def spawn(
         retry_when_fail=retry_when_fail,
         resolve_tileable_input=resolve_tileable_input,
         n_output=n_output,
+        output_types=output_types,
         **kw,
     )
     if op.extra_params:

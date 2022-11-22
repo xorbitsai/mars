@@ -19,7 +19,7 @@ from ...utils import has_unknown_shape, calc_nsplits
 
 
 def refresh_tileable_shape(tileable):
-    if has_unknown_shape(tileable):
+    if tileable.shape is None or has_unknown_shape(tileable):
         # update shape
         nsplits = calc_nsplits({c.index: c.shape for c in tileable.chunks})
         shape = tuple(sum(ns) for ns in nsplits)
