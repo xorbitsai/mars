@@ -27,14 +27,6 @@ from ....utils import pd_release_version
 _drop_na_enable_no_default = pd_release_version[:2] >= (1, 5)
 
 
-def test_isna_scalars():
-    assert False == md.isna("dog")
-    assert True == md.isna(None)
-    assert True == md.isna(md.NA)
-    assert True == md.isna(md.NaT)
-    assert True == md.isna(mt.nan)
-
-
 def test_fill_na():
     df_raw = pd.DataFrame(np.nan, index=range(0, 20), columns=list("ABCDEFGHIJ"))
     for _ in range(20):
@@ -231,3 +223,165 @@ def test_replace():
     assert r.chunks[0].shape == (4,)
     assert r.chunks[0].op.stage is None
     assert r.chunks[0].op.limit is None
+
+
+def test_isna(setup):
+    from ..checkna import isna
+
+    # scalars
+    assert isna("dog") == False
+    assert isna(None) == True
+    assert isna(md.NA) == True
+    assert isna(md.NaT) == True
+    assert isna(mt.nan) == True
+    assert isna(type) == False
+
+    # multi index
+    with pytest.raises(NotImplementedError):
+        midx = md.MultiIndex()
+        isna(midx)
+
+    # numpy ndarray
+    narr = np.array((1, 2, 3))
+    actual = isna(narr).execute().fetch()
+    expected = pd.isna(narr)
+    np.testing.assert_array_equal(expected, actual)
+
+    # pandas index
+    pi = pd.Index((1, 2, 3))
+    actual = isna(pi).execute().fetch()
+    expected = pd.isna(pi)
+    np.testing.assert_array_equal(expected, actual)
+
+    # pandas series
+    ps = pd.Series((1, 2, 3))
+    actual = isna(ps).execute().fetch()
+    expected = pd.isna(ps)
+    pd.testing.assert_series_equal(expected, actual)
+
+    # pandas dataframe
+    pdf = pd.DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6)})
+    actual = isna(pdf).execute().fetch()
+    expected = pd.isna(pdf)
+    pd.testing.assert_frame_equal(expected, actual)
+
+    # list
+    l = [1, 2, 3]
+    actual = isna(l).execute().fetch()
+    expected = pd.isna(l)
+    np.testing.assert_array_equal(expected, actual)
+
+    # tuple
+    t = (1, 2, 3)
+    assert False == isna(t)
+
+    # mars tensor
+    marr = mt.tensor(narr)
+    actual = isna(marr).execute().fetch()
+    expected = pd.isna(narr)
+    np.testing.assert_array_equal(expected, actual)
+
+    # mars index
+    from ...datasource.index import from_pandas as from_pandas_index
+
+    mi = from_pandas_index(pi)
+    actual = isna(mi).execute().fetch()
+    expected = pd.isna(pi)
+    np.testing.assert_array_equal(expected, actual)
+
+    # mars series
+    from ...datasource.series import from_pandas as from_pandas_series
+
+    ms = from_pandas_series(ps)
+    actual = isna(ms).execute().fetch()
+    expected = pd.isna(ps)
+    pd.testing.assert_series_equal(expected, actual)
+
+    # mars dataframe
+    from ...datasource.dataframe import from_pandas as from_pandas_df
+
+    mdf = from_pandas_df(pdf)
+    actual = isna(mdf).execute().fetch()
+    expected = pd.isna(pdf)
+    pd.testing.assert_frame_equal(expected, actual)
+
+
+def test_notna(setup):
+    from ..checkna import notna
+
+    # scalars
+    assert notna("dog") == True
+    assert notna(None) == False
+    assert notna(md.NA) == False
+    assert notna(md.NaT) == False
+    assert notna(mt.nan) == False
+    assert notna(type) == True
+
+    # multi index
+    with pytest.raises(NotImplementedError):
+        midx = md.MultiIndex()
+        notna(midx)
+
+    # numpy ndarray
+    narr = np.array((1, 2, 3))
+    actual = notna(narr).execute().fetch()
+    expected = pd.notna(narr)
+    np.testing.assert_array_equal(expected, actual)
+
+    # pandas index
+    pi = pd.Index((1, 2, 3))
+    actual = notna(pi).execute().fetch()
+    expected = pd.notna(pi)
+    np.testing.assert_array_equal(expected, actual)
+
+    # pandas series
+    ps = pd.Series((1, 2, 3))
+    actual = notna(ps).execute().fetch()
+    expected = pd.notna(ps)
+    pd.testing.assert_series_equal(expected, actual)
+
+    # pandas dataframe
+    pdf = pd.DataFrame({"foo": (1, 2, 3), "bar": (4, 5, 6)})
+    actual = notna(pdf).execute().fetch()
+    expected = pd.notna(pdf)
+    pd.testing.assert_frame_equal(expected, actual)
+
+    # list
+    l = [1, 2, 3]
+    actual = notna(l).execute().fetch()
+    expected = pd.notna(l)
+    np.testing.assert_array_equal(expected, actual)
+
+    # tuple
+    t = (1, 2, 3)
+    assert notna(t) == True
+
+    # mars tensor
+    marr = mt.tensor(narr)
+    actual = notna(marr).execute().fetch()
+    expected = pd.notna(narr)
+    np.testing.assert_array_equal(expected, actual)
+
+    # mars index
+    from ...datasource.index import from_pandas as from_pandas_index
+
+    mi = from_pandas_index(pi)
+    actual = notna(mi).execute().fetch()
+    expected = pd.notna(pi)
+    np.testing.assert_array_equal(expected, actual)
+
+    # mars series
+    from ...datasource.series import from_pandas as from_pandas_series
+
+    ms = from_pandas_series(ps)
+    actual = notna(ms).execute().fetch()
+    expected = pd.notna(ps)
+    pd.testing.assert_series_equal(expected, actual)
+
+    # mars dataframe
+    from ...datasource.dataframe import from_pandas as from_pandas_df
+
+    mdf = from_pandas_df(pdf)
+    actual = notna(mdf).execute().fetch()
+    expected = pd.notna(pdf)
+    pd.testing.assert_frame_equal(expected, actual)

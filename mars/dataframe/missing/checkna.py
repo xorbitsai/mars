@@ -25,10 +25,13 @@ from ..operands import (
     DataFrameOperand,
     DataFrameOperandMixin,
     DATAFRAME_TYPE,
+    ENTITY_TYPE,
     INDEX_TYPE,
     SERIES_TYPE,
     TENSOR_TYPE,
 )
+
+from typing import Any
 
 
 class DataFrameCheckNA(DataFrameOperand, DataFrameOperandMixin):
@@ -63,11 +66,6 @@ class DataFrameCheckNA(DataFrameOperand, DataFrameOperandMixin):
             self.output_types = [OutputType.series]
         elif isinstance(df, TENSOR_TYPE) or isinstance(df, INDEX_TYPE):
             self.output_types = [OutputType.tensor]
-        else:
-            # all the other types are treated as scalar, including pandas dataframe.
-            if df is None or df is md.NA or df is md.NaT or df is mt.nan:
-                return True
-            return False
 
         params = df.params.copy()
         if self.output_types[0] == OutputType.dataframe:
@@ -107,14 +105,29 @@ class DataFrameCheckNA(DataFrameOperand, DataFrameOperandMixin):
         try:
             pd.set_option("mode.use_inf_as_na", op.use_inf_as_na)
             if op.positive:
-                ctx[op.outputs[0].key] = in_data.isna()
+                ctx[op.outputs[0].key] = pd.isna(in_data)
             else:
-                ctx[op.outputs[0].key] = in_data.notna()
+                ctx[op.outputs[0].key] = pd.notna(in_data)
         finally:
             pd.reset_option("mode.use_inf_as_na")
 
 
-def isna(df):
+def _from_pandas(obj: Any):
+    if isinstance(obj, pd.DataFrame):
+        from ..datasource.dataframe import from_pandas
+
+        return from_pandas(obj)
+    elif isinstance(obj, pd.Series):
+        from ..datasource.series import from_pandas
+
+        return from_pandas(obj)
+    elif isinstance(obj, np.ndarray):
+        return mt.tensor(obj)
+    else:
+        return obj
+
+
+def isna(obj):
     """
     Detect missing values.
 
@@ -177,13 +190,18 @@ def isna(df):
     2     True
     dtype: bool
     """
-    op = DataFrameCheckNA(
-        positive=True, use_inf_as_na=options.dataframe.mode.use_inf_as_na
-    )
-    return op(df)
+    if isinstance(obj, md.MultiIndex):
+        raise NotImplementedError("isna is not defined for MultiIndex")
+    elif isinstance(obj, ENTITY_TYPE):
+        op = DataFrameCheckNA(
+            positive=True, use_inf_as_na=options.dataframe.mode.use_inf_as_na
+        )
+        return op(obj)
+    else:
+        return _from_pandas(pd.isna(obj))
 
 
-def notna(df):
+def notna(obj):
     """
     Detect existing (non-missing) values.
 
@@ -245,10 +263,15 @@ def notna(df):
     2    False
     dtype: bool
     """
-    op = DataFrameCheckNA(
-        positive=False, use_inf_as_na=options.dataframe.mode.use_inf_as_na
-    )
-    return op(df)
+    if isinstance(obj, md.MultiIndex):
+        raise NotImplementedError("isna is not defined for MultiIndex")
+    elif isinstance(obj, ENTITY_TYPE):
+        op = DataFrameCheckNA(
+            positive=False, use_inf_as_na=options.dataframe.mode.use_inf_as_na
+        )
+        return op(obj)
+    else:
+        return _from_pandas(pd.notna(obj))
 
 
 isnull = isna
