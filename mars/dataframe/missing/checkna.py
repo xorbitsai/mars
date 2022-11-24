@@ -48,7 +48,7 @@ class DataFrameCheckNA(DataFrameOperand, DataFrameOperandMixin):
             _use_inf_as_na=use_inf_as_na,
             _output_types=output_types,
             sparse=sparse,
-            **kw
+            **kw,
         )
 
     @property
@@ -66,6 +66,10 @@ class DataFrameCheckNA(DataFrameOperand, DataFrameOperandMixin):
             self.output_types = [OutputType.series]
         elif isinstance(df, TENSOR_TYPE) or isinstance(df, INDEX_TYPE):
             self.output_types = [OutputType.tensor]
+        else:
+            raise TypeError(
+                f"Expecting mars dataframe, series, index, or tensor, got {type(df)}"
+            )
 
         params = df.params.copy()
         if self.output_types[0] == OutputType.dataframe:

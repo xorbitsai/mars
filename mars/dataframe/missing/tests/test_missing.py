@@ -230,8 +230,10 @@ def test_isna(setup, inf_as_na):
     from ..checkna import isna
     from ....config import options
 
+    old_mars_inf_as_na = options.dataframe.mode.use_inf_as_na
     options.dataframe.mode.use_inf_as_na = inf_as_na
     # this option could be changed by mars execution.
+    old_pd_inf_as_na = pd.get_option("mode.use_inf_as_na")
     pd.options.mode.use_inf_as_na = inf_as_na
 
     # scalars
@@ -326,14 +328,19 @@ def test_isna(setup, inf_as_na):
     expected = pd.isna(pdf)
     pd.testing.assert_frame_equal(expected, actual)
 
+    options.dataframe.mode.use_inf_as_na = old_mars_inf_as_na
+    pd.options.mode.use_inf_as_na = old_pd_inf_as_na
+
 
 @pytest.mark.parametrize("inf_as_na", [True, False])
 def test_notna(setup, inf_as_na):
     from ..checkna import notna
     from ....config import options
 
+    old_mars_inf_as_na = options.dataframe.mode.use_inf_as_na
     options.dataframe.mode.use_inf_as_na = inf_as_na
     # this option could be changed by mars execution.
+    old_pd_inf_as_na = pd.get_option("mode.use_inf_as_na")
     pd.options.mode.use_inf_as_na = inf_as_na
 
     # scalars
@@ -426,3 +433,6 @@ def test_notna(setup, inf_as_na):
     actual = notna(mdf).execute().fetch()
     expected = pd.notna(pdf)
     pd.testing.assert_frame_equal(expected, actual)
+
+    options.dataframe.mode.use_inf_as_na = old_mars_inf_as_na
+    pd.options.mode.use_inf_as_na = old_pd_inf_as_na
