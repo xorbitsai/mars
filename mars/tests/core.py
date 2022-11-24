@@ -261,7 +261,7 @@ class ObjectCheckMixin:
         return value
 
     def assert_shape_consistent(self, expected_shape, real_shape):
-        if not self._check_options["check_shape"]:
+        if not self._check_options["check_shape"] or not expected_shape:
             return
 
         if len(expected_shape) != len(real_shape):
@@ -336,7 +336,7 @@ class ObjectCheckMixin:
 
     @classmethod
     def assert_index_value_consistent(cls, expected_index_value, real_index):
-        if expected_index_value.has_value():
+        if expected_index_value is not None and expected_index_value.has_value():
             expected_index = expected_index_value.to_pandas()
             try:
                 pd.testing.assert_index_equal(
@@ -357,6 +357,8 @@ class ObjectCheckMixin:
             real = real[0]
         if not isinstance(real, dataframe_types):
             raise AssertionError(f"Type of real value ({type(real)}) not DataFrame")
+        if expected.shape is None:
+            return
         self.assert_shape_consistent(expected.shape, real.shape)
         if not np.isnan(expected.shape[1]) and expected.dtypes is not None:
             if self._check_options["check_dtypes"]:
@@ -390,11 +392,12 @@ class ObjectCheckMixin:
             raise AssertionError(f"Type of real value ({type(real)}) not Series")
         self.assert_shape_consistent(expected.shape, real.shape)
 
-        if self._check_options["check_series_name"] and expected.name != real.name:
-            raise AssertionError(
-                f"series name in metadata {expected.name} "
-                f"is not equal to real name {real.name}"
-            )
+        if self._check_options["check_series_name"]:
+            if expected.name is not None and expected.name != real.name:
+                raise AssertionError(
+                    f"series name in metadata {expected.name} "
+                    f"is not equal to real name {real.name}"
+                )
 
         self.assert_dtype_consistent(expected.dtype, real.dtype)
         if self._check_options["check_index_value"]:

@@ -23,9 +23,11 @@ from ... import get_context
 from ... import oscar as mo
 from ... import tensor as mt
 from ...core import tile
+from ...dataframe.core import DATAFRAME_TYPE, SERIES_TYPE
 from ...deploy.oscar.session import get_default_session
 from ...learn.utils import shuffle
 from ...lib.mmh3 import hash as mmh3_hash
+from ...tensor.core import TENSOR_TYPE
 from .. import spawn, ExecutableTuple
 
 
@@ -79,6 +81,43 @@ def test_remote_function(setup):
         return mt.ones((2, 3)).sum().to_numpy()
 
     assert spawn(f).execute().fetch() == 6
+
+
+def test_specify_output_types(setup):
+    pd_df = pd.DataFrame(np.ones((10, 3)), columns=["a", "b", "c"])
+
+    def f1():
+        return pd_df
+
+    r = spawn(f1, output_types="dataframe").execute()
+
+    assert isinstance(r, DATAFRAME_TYPE)
+    assert r.index_value is not None
+    pd.testing.assert_frame_equal(r.fetch(), pd_df)
+    pd.testing.assert_index_equal(r.columns.to_pandas(), pd_df.columns)
+
+    pd_series = pd.Series(np.ones((10,)), name="a")
+
+    def f2():
+        return pd_series
+
+    r = spawn(f2, output_types="series").execute()
+
+    assert isinstance(r, SERIES_TYPE)
+    assert r.index_value is not None
+    assert r.name == pd_series.name
+    pd.testing.assert_series_equal(r.fetch(), pd_series)
+
+    np_array = np.random.rand(10, 10)
+
+    def f2():
+        return np_array
+
+    r = spawn(f2, output_types="tensor").execute()
+
+    assert isinstance(r, TENSOR_TYPE)
+    assert r.dtype == np_array.dtype
+    np.testing.assert_array_equal(r.fetch(), np_array)
 
 
 def test_context(setup_cluster):

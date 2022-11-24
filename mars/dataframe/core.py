@@ -425,7 +425,8 @@ def refresh_index_value(tileable: ENTITY_TYPE):
             index_to_index_values[chunk.index] = chunk.index_value
     index_value = merge_index_value(index_to_index_values, store_data=False)
     # keep key as original index_value's
-    index_value._index_value._key = tileable.index_value.key
+    if tileable.index_value is not None:
+        index_value._index_value._key = tileable.index_value.key
     tileable._index_value = index_value
 
 
@@ -1374,7 +1375,7 @@ class BaseSeriesData(HasShapeTileableData, _ToPandasMixin):
 
     @property
     def dtype(self):
-        return getattr(self, "_dtype", None) or self.op.dtype
+        return getattr(self, "_dtype", None) or getattr(self.op, "dtype", None)
 
     @property
     def name(self):
