@@ -102,14 +102,15 @@ class DataFrameCheckNA(DataFrameOperand, DataFrameOperandMixin):
     @classmethod
     def execute(cls, ctx, op: "DataFrameCheckNA"):
         in_data = ctx[op.inputs[0].key]
+        old_use_inf_as_na = pd.get_option("mode.use_inf_as_na")
         try:
             pd.set_option("mode.use_inf_as_na", op.use_inf_as_na)
             if op.positive:
-                ctx[op.outputs[0].key] = pd.isna(in_data)
+                ctx[op.outputs[0].key] = in_data.isna()
             else:
-                ctx[op.outputs[0].key] = pd.notna(in_data)
+                ctx[op.outputs[0].key] = in_data.notna()
         finally:
-            pd.reset_option("mode.use_inf_as_na")
+            pd.set_option("mode.use_inf_as_na", old_use_inf_as_na)
 
 
 def _from_pandas(obj: Any):
@@ -193,10 +194,16 @@ def isna(obj):
     if isinstance(obj, md.MultiIndex):
         raise NotImplementedError("isna is not defined for MultiIndex")
     elif isinstance(obj, ENTITY_TYPE):
-        op = DataFrameCheckNA(
-            positive=True, use_inf_as_na=options.dataframe.mode.use_inf_as_na
-        )
-        return op(obj)
+        if isinstance(obj, TENSOR_TYPE):
+            if options.dataframe.mode.use_inf_as_na:
+                return ~mt.isfinite(obj)
+            else:
+                return mt.isnan(obj)
+        else:
+            op = DataFrameCheckNA(
+                positive=True, use_inf_as_na=options.dataframe.mode.use_inf_as_na
+            )
+            return op(obj)
     else:
         return _from_pandas(pd.isna(obj))
 
@@ -266,10 +273,16 @@ def notna(obj):
     if isinstance(obj, md.MultiIndex):
         raise NotImplementedError("isna is not defined for MultiIndex")
     elif isinstance(obj, ENTITY_TYPE):
-        op = DataFrameCheckNA(
-            positive=False, use_inf_as_na=options.dataframe.mode.use_inf_as_na
-        )
-        return op(obj)
+        if isinstance(obj, TENSOR_TYPE):
+            if options.dataframe.mode.use_inf_as_na:
+                return mt.isfinite(obj)
+            else:
+                return ~mt.isnan(obj)
+        else:
+            op = DataFrameCheckNA(
+                positive=False, use_inf_as_na=options.dataframe.mode.use_inf_as_na
+            )
+            return op(obj)
     else:
         return _from_pandas(pd.notna(obj))
 
