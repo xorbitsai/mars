@@ -175,7 +175,8 @@ class RunScript(MergeDictOperand):
         finally:
             os.environ = old_env
             sys.argv = old_argv
-            old_default_session.as_default()
+            if old_default_session is not None:
+                old_default_session.as_default()
             sys.stdout.flush()
 
 
