@@ -400,6 +400,13 @@ class Tileable(Entity):
         else:
             entity_view_handler.data_changed(self._data, new_data)
 
+    def execute(self, session=None, **kw):
+        result = self.data.execute(session=session, **kw)
+        if isinstance(result, TILEABLE_TYPE):
+            return self
+        else:
+            return result
+
 
 TILEABLE_TYPE = (Tileable, TileableData)
 
@@ -461,10 +468,3 @@ class HasShapeTileable(Tileable):
     @property
     def size(self):
         return self._data.size
-
-    def execute(self, session=None, **kw):
-        result = self.data.execute(session=session, **kw)
-        if isinstance(result, TILEABLE_TYPE):
-            return self
-        else:
-            return result
