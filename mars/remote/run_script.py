@@ -155,6 +155,12 @@ class RunScript(MergeDictOperand):
         envs = cls._build_envs(ctx, op)
         old_argv = sys.argv.copy()
 
+        # since a new session will be created and set as default, the current default session need
+        # to be restored after the execution of the script.
+        from ..deploy.oscar.session import get_default_session
+
+        old_default_session = get_default_session()
+
         try:
             os.environ.update(envs)
             sys.argv = ["script"]
@@ -169,6 +175,7 @@ class RunScript(MergeDictOperand):
         finally:
             os.environ = old_env
             sys.argv = old_argv
+            old_default_session.as_default()
             sys.stdout.flush()
 
 
