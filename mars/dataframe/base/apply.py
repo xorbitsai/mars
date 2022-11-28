@@ -98,7 +98,6 @@ class ApplyOperand(
     ):
         if output_type:
             kw["_output_types"] = [output_type]
-        self.output_type = output_type
         super().__init__(
             _func=func,
             _axis=axis,
@@ -539,7 +538,7 @@ class ApplyOperand(
         dtype = make_dtype(dtype)
         self._axis = validate_axis(axis, df_or_series)
 
-        if self.output_type == OutputType.df_or_series:
+        if self.output_types and self.output_types[0] == OutputType.df_or_series:
             return self._call_df_or_series(df_or_series)
 
         if df_or_series.op.output_types[0] == OutputType.dataframe:
