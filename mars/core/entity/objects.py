@@ -16,9 +16,8 @@ from typing import Any, Dict
 
 from ...serialization.serializables import FieldTypes, ListField
 from .chunks import ChunkData, Chunk
-from .core import Entity
 from .executable import _ToObjectMixin
-from .tileables import TileableData
+from .tileables import Tileable, TileableData
 
 
 class ObjectChunkData(ChunkData):
@@ -89,7 +88,7 @@ class ObjectData(TileableData, _ToObjectMixin):
         pass
 
 
-class Object(Entity, _ToObjectMixin):
+class Object(Tileable, _ToObjectMixin):
     __slots__ = ()
     _allow_data_type_ = (ObjectData,)
     type_name = "Object"
