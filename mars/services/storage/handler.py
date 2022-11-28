@@ -83,8 +83,19 @@ class StorageHandlerActor(mo.Actor):
                 if client.level & level:
                     clients[level] = client
 
-    async def _get_data(self, data_info, conditions):
-        if conditions is None:
+    async def _get_data(self, data_info: DataInfo, conditions: List[Any]):
+        if data_info.offset is not None:
+            reader = await self._clients[data_info.level].open_reader(
+                data_info.object_id
+            )
+            await reader.seek(data_info.offset)
+            res = await AioDeserializer(reader).run()
+            if conditions is not None:
+                try:
+                    res = res.iloc[tuple(conditions)]
+                except AttributeError:
+                    res = res[tuple(conditions)]
+        elif conditions is None:
             res = yield self._clients[data_info.level].get(data_info.object_id)
         else:
             try:

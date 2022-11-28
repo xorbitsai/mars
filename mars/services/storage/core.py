@@ -67,14 +67,14 @@ class WrappedStorageFileObject(AioFileObject):
         self._data_key = data_key
         self._data_manager = data_manager
         self._storage_handler = storage_handler
-        # meta for multiple data
-        self._meta = dict()
+        # infos for multiple data
+        self._sub_key_infos = dict()
 
     def __getattr__(self, item):
         return getattr(self._file, item)
 
-    def append_meta(self, key, offset, size):
-        self._meta[key] = (offset, size)
+    def commit_once(self, key, offset, size):
+        self._sub_key_infos[key] = (offset, size)
 
     async def clean_up(self):
         self._file.close()
@@ -90,7 +90,11 @@ class WrappedStorageFileObject(AioFileObject):
             object_info.size = self._size
             data_info = build_data_info(object_info, self._level, self._size)
             await self._data_manager.put_data_info(
-                self._session_id, self._data_key, data_info, object_info, self._meta
+                self._session_id,
+                self._data_key,
+                data_info,
+                object_info,
+                self._sub_key_infos,
             )
 
 
@@ -178,8 +182,8 @@ class InternalDataInfo:
 
 @dataslots
 @dataclass
-class FileMeta:
-    file_name: str
+class SubInfos:
+    main_key: str
     offset: int
     size: int
 
@@ -201,8 +205,8 @@ class DataManagerActor(mo.Actor):
         self._main_key_to_sub_keys = defaultdict(set)
         # we may store multiple small data into one file,
         # it records offset and size.
-        self._data_key_to_store_key = dict()
-        self._key_to_meta = dict()
+        self._sub_key_to_store_key = dict()
+        self._key_to_sub_infos = dict()
         for level in StorageLevel.__members__.values():
             for band_name in bands:
                 self._data_info_list[level, band_name] = dict()
@@ -253,9 +257,9 @@ class DataManagerActor(mo.Actor):
         error: str = "raise",
     ) -> Union[DataInfo, None]:
         store_info = None
-        if (session_id, data_key) in self._data_key_to_store_key:
-            store_info = self._data_key_to_store_key[(session_id, data_key)]
-            data_key = store_info.file_name
+        if (session_id, data_key) in self._sub_key_to_store_key:
+            store_info = self._sub_key_to_store_key[(session_id, data_key)]
+            data_key = store_info.main_key
 
         # if the data is stored in multiply levels,
         # return the lowest level info
@@ -282,7 +286,7 @@ class DataManagerActor(mo.Actor):
         data_key: str,
         data_info: DataInfo,
         object_info: ObjectInfo = None,
-        file_meta: Dict = None,
+        sub_key_infos: Dict = None,
     ):
         info = InternalDataInfo(data_info, object_info)
         self._data_key_to_info[(session_id, data_key)].append(info)
@@ -294,12 +298,12 @@ class DataManagerActor(mo.Actor):
         )
         if isinstance(data_key, tuple):
             self._main_key_to_sub_keys[(session_id, data_key[0])].update([data_key])
-        if file_meta:
-            for key, (offset, size) in file_meta.items():
-                self._data_key_to_store_key[(session_id, key)] = FileMeta(
+        if sub_key_infos:
+            for key, (offset, size) in sub_key_infos.items():
+                self._sub_key_to_store_key[(session_id, key)] = SubInfos(
                     data_key, offset, size
                 )
-            self._key_to_meta[(session_id, data_key)] = file_meta
+            self._key_to_sub_infos[(session_id, data_key)] = sub_key_infos
 
     @mo.extensible
     def delete_data_info(
@@ -324,26 +328,26 @@ class DataManagerActor(mo.Actor):
 
     @mo.extensible
     def get_store_key(self, session_id: str, data_key: str):
-        if (session_id, data_key) in self._data_key_to_store_key:
-            return self._data_key_to_store_key[(session_id, data_key)].file_name
+        if (session_id, data_key) in self._sub_key_to_store_key:
+            return self._sub_key_to_store_key[(session_id, data_key)].main_key
         else:
             return data_key
 
     @mo.extensible
     def delete_part_data(self, session_id: str, data_key: str):
-        if (session_id, data_key) in self._data_key_to_store_key:
-            file = self._data_key_to_store_key[(session_id, data_key)].file_name
-            meta = self._key_to_meta[(session_id, file)]
-            meta.pop(data_key)
-            if len(meta) == 0:
-                return file
+        if (session_id, data_key) in self._sub_key_to_store_key:
+            key = self._sub_key_to_store_key[(session_id, data_key)].main_key
+            infos = self._key_to_sub_infos[(session_id, key)]
+            infos.pop(data_key)
+            if len(infos) == 0:
+                return key
         else:
             return data_key
 
     @mo.extensible
-    def get_file_meta(self, session_id: str, store_key: str):
-        if (session_id, store_key) in self._key_to_meta:
-            return self._key_to_meta[(session_id, store_key)]
+    def get_sub_infos(self, session_id: str, store_key: str):
+        if (session_id, store_key) in self._key_to_sub_infos:
+            return self._key_to_sub_infos[(session_id, store_key)]
         else:
             return None
 

@@ -135,9 +135,9 @@ class SenderManagerActor(mo.StatelessActor):
             tasks.append(self._data_manager_ref.get_store_key.delay(session_id, key))
         data_keys = await self._data_manager_ref.get_store_key.batch(*tasks)
         data_keys = list(set(data_keys))
-        metas = await self._data_manager_ref.get_file_meta.batch(
+        sub_infos = await self._data_manager_ref.get_sub_infos.batch(
             *[
-                self._data_manager_ref.get_file_meta.delay(session_id, key)
+                self._data_manager_ref.get_sub_infos.delay(session_id, key)
                 for key in data_keys
             ]
         )
@@ -175,7 +175,7 @@ class SenderManagerActor(mo.StatelessActor):
         if level is None:
             level = infos[0].level
         is_transferring_list = await receiver_ref.open_writers(
-            session_id, data_keys, data_sizes, level, metas
+            session_id, data_keys, data_sizes, level, sub_infos
         )
         to_send_keys = []
         to_wait_keys = []
@@ -248,20 +248,20 @@ class ReceiverManagerActor(mo.StatelessActor):
         data_keys: List[str],
         data_sizes: List[int],
         level: StorageLevel,
-        metas: List,
+        sub_infos: List,
     ):
         tasks = dict()
-        key_to_meta = dict()
+        key_to_sub_infos = dict()
         data_key_to_size = dict()
         being_processed = []
-        for data_key, data_size, meta in zip(data_keys, data_sizes, metas):
+        for data_key, data_size, sub_info in zip(data_keys, data_sizes, sub_infos):
             data_key_to_size[data_key] = data_size
             if (session_id, data_key) not in self._writing_infos:
                 being_processed.append(False)
                 tasks[data_key] = self._storage_handler.open_writer.delay(
                     session_id, data_key, data_size, level, request_quota=False
                 )
-                key_to_meta[data_key] = meta
+                key_to_sub_infos[data_key] = sub_info
             else:
                 being_processed.append(True)
                 self._writing_infos[(session_id, data_key)].ref_counts += 1
@@ -273,8 +273,8 @@ class ReceiverManagerActor(mo.StatelessActor):
                 self._writing_infos[(session_id, data_key)] = WritingInfo(
                     writer, data_key_to_size[data_key], level, asyncio.Event(), 1
                 )
-                if key_to_meta[data_key] is not None:
-                    writer._meta = key_to_meta[data_key]
+                if key_to_sub_infos[data_key] is not None:
+                    writer._sub_key_infos = key_to_sub_infos[data_key]
         return being_processed
 
     async def open_writers(
@@ -283,12 +283,12 @@ class ReceiverManagerActor(mo.StatelessActor):
         data_keys: List[str],
         data_sizes: List[int],
         level: StorageLevel,
-        metas: List,
+        sub_infos: List,
     ):
         async with self._lock:
             await self._storage_handler.request_quota_with_spill(level, sum(data_sizes))
             future = asyncio.create_task(
-                self.create_writers(session_id, data_keys, data_sizes, level, metas)
+                self.create_writers(session_id, data_keys, data_sizes, level, sub_infos)
             )
             try:
                 return await future
