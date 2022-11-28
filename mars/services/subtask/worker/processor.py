@@ -548,6 +548,8 @@ class SubtaskProcessor:
             for reducer_index, band in reducer_index_to_bands.items():
                 # mapper key is a tuple
                 address, band_name = band
+                if band == self._band:
+                    continue
                 storage_api = await StorageAPI.create(
                     self._session_id, address, band_name
                 )
@@ -741,7 +743,7 @@ class SubtaskProcessorActor(mo.Actor):
         await context.init()
         set_context(context)
 
-    async def run(self, subtask: Subtask, wait_post_run: bool = False):
+    async def run(self, subtask: Subtask, wait_post_run: bool = True):
         logger.info(
             "Start to run subtask: %r on %s. chunk graph contains %s",
             subtask,
@@ -769,7 +771,7 @@ class SubtaskProcessorActor(mo.Actor):
             logger.info("Finished subtask: %s", subtask.subtask_id)
             # post run with actor tell which will not block
             # if not wait_post_run:
-            #     await self.ref().post_run.tell(processor)
+            #     asyncio.create_task(processor.post_run())
             # else:
             #     await self.post_run(processor)
             raise mo.Return(result)
