@@ -145,6 +145,10 @@ class ClusterWebAPIHandler(MarsServiceWebAPIHandler):
         cluster_api = await self._get_cluster_api()
         address = self.get_argument("address", "") or None
         pools = list(await cluster_api.get_node_pool_configs(address))
+        # Since logging_conf field cannot be serialized by json,
+        # and this field is not used by the front end, it is removed.
+        for pool in pools:
+            pool.pop("logging_conf", None)
         self.write(json.dumps({"pools": pools}))
 
     @web_api("stacks", method="get", cache_blocking=True)
