@@ -83,6 +83,11 @@ class StorageHandlerActor(mo.Actor):
                 if client.level & level:
                     clients[level] = client
 
+    def is_seekable(self, level: StorageLevel):
+        if level is None:
+            level = self.highest_level
+        return self._clients[level].is_seekable
+
     async def _get_data(self, data_info: DataInfo, conditions: List[Any]):
         if data_info.offset is not None:
             reader = await self._clients[data_info.level].open_reader(
@@ -300,10 +305,10 @@ class StorageHandlerActor(mo.Actor):
         for args, kwargs in zip(args_list, kwargs_list):
             session_id, data_key, error = self.delete.bind(*args, **kwargs)
             data_keys.append(
-                self._data_manager_ref.delete_part_data.delay(session_id, data_key)
+                self._data_manager_ref.get_store_key.delay(session_id, data_key)
             )
-        data_keys = await self._data_manager_ref.delete_part_data.batch(*data_keys)
-        data_keys = [key for key in data_keys if key is not None]
+        data_keys = await self._data_manager_ref.get_store_key.batch(*data_keys)
+        data_keys = set(key for key in data_keys if key is not None)
 
         infos_list = await self._data_manager_ref.get_data_infos.batch(
             *[

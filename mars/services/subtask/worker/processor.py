@@ -297,8 +297,9 @@ class SubtaskProcessor:
         # store data into storage
         data_key_to_puts = {}
         shuffle_key_to_data = {}
+        is_storage_seekable = await self._storage_api.is_seekable()
         for key, data, _ in iter_output_data(chunk_graph, self._processor_context):
-            if isinstance(key, tuple):
+            if isinstance(key, tuple) and is_storage_seekable:
                 shuffle_key_to_data[key] = data
             else:
                 put = self._storage_api.put.delay(key, data)
@@ -394,7 +395,7 @@ class SubtaskProcessor:
     ):
         band_to_mapper_key = defaultdict(list)
         for result_chunk in self._chunk_graph.result_chunks:
-            map_reduce_id = getattr(result_chunk.op, "extra_params", dict()).get(
+            map_reduce_id = getattr(result_chunk, "extra_params", dict()).get(
                 "analyzer_map_reduce_id"
             )
             if map_reduce_id is None:

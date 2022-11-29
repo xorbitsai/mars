@@ -355,17 +355,17 @@ class GraphAnalyzer:
         map_chunks = [
             c
             for c in self._chunk_graph.predecessors(chunk)
-            if c.op.stage == OperandStage.map
+            if (c.op.stage == OperandStage.map) or c.is_mapper
         ]
         map_reduce_id = self.next_map_reduce_id()
         for map_chunk in map_chunks:
             # record analyzer map reduce id for mapper op
             # copied chunk exists because map chunk must have
             # been processed before shuffle proxy
-            copied_map_chunk_op = self._chunk_to_copied[map_chunk].op
-            if not hasattr(copied_map_chunk_op, "extra_params"):
-                copied_map_chunk_op.extra_params = dict()
-            copied_map_chunk_op.extra_params["analyzer_map_reduce_id"] = map_reduce_id
+            copied_map_chunk = self._chunk_to_copied[map_chunk]
+            if not hasattr(copied_map_chunk, "extra_params"):
+                copied_map_chunk.extra_params = dict()
+            copied_map_chunk.extra_params["analyzer_map_reduce_id"] = map_reduce_id
         reducer_bands = [assign_results[r.outputs[0]] for r in reducer_ops]
         map_reduce_info = MapReduceInfo(
             map_reduce_id=map_reduce_id,

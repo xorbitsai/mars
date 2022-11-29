@@ -502,7 +502,7 @@ async def test_shuffle(actor_pool):
     map_reduce_ids = []
     for subtask in subtask_graphs:
         for chunk in subtask.chunk_graph.result_chunks:
-            map_reduce_id = getattr(chunk.op, "extra_params", dict()).get(
+            map_reduce_id = getattr(chunk, "extra_params", dict()).get(
                 "analyzer_map_reduce_id"
             )
             if map_reduce_id is not None:

@@ -334,17 +334,6 @@ class DataManagerActor(mo.Actor):
             return data_key
 
     @mo.extensible
-    def delete_part_data(self, session_id: str, data_key: str):
-        if (session_id, data_key) in self._sub_key_to_store_key:
-            key = self._sub_key_to_store_key[(session_id, data_key)].main_key
-            infos = self._key_to_sub_infos[(session_id, key)]
-            infos.pop(data_key)
-            if len(infos) == 0:
-                return key
-        else:
-            return data_key
-
-    @mo.extensible
     def get_sub_infos(self, session_id: str, store_key: str):
         if (session_id, store_key) in self._key_to_sub_infos:
             return self._key_to_sub_infos[(session_id, store_key)]

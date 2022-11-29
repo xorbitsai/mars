@@ -83,6 +83,12 @@ class StorageAPI(AbstractStorageAPI):
         await api._init()
         return api
 
+    async def is_seekable(self, storage_level: StorageLevel = None) -> bool:
+        """
+        If storage backend is seekable.
+        """
+        return await self._storage_handler_ref.is_seekable(storage_level)
+
     @mo.extensible
     async def get(
         self, data_key: str, conditions: List = None, error: str = "raise"
