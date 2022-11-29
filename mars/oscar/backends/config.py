@@ -28,6 +28,8 @@ class ActorPoolConfig:
             self._conf["mapping"] = dict()
         if "metrics" not in self._conf:
             self._conf["metrics"] = dict()
+        if "comm" not in self._conf:
+            self._conf["comm"] = dict()
 
     @property
     def n_pool(self):
@@ -126,3 +128,10 @@ class ActorPoolConfig:
 
     def get_metric_configs(self):
         return self._conf["metrics"]
+
+    def add_comm_config(self, comm_config: Dict[str, Any]):
+        if comm_config:
+            self._conf["comm"].update(comm_config)
+
+    def get_comm_config(self) -> dict:
+        return self._conf["comm"]

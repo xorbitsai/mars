@@ -199,7 +199,7 @@ class ColumnPruningRule(OptimizationRule):
                 new_dtypes = pd.Series(
                     dict(
                         (col, dtype)
-                        for col, dtype in node.dtypes.iteritems()
+                        for col, dtype in node.dtypes.items()
                         if col in selected_columns
                     )
                 )

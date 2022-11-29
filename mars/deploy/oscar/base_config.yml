@@ -63,3 +63,24 @@ metrics:
   # If backend is prometheus, then we can add prometheus config as follows:
   # prometheus:
   #   port: 8988
+oscar:
+  numa:
+    # external address scheme, default null,
+    # available value including: null, ucx
+    external_addr_scheme: null
+    # enable internal address for in-process communication
+    enable_internal_addr: yes
+  gpu:
+    # external address scheme, default null,
+    # available value including: null, ucx
+    external_addr_scheme: null
+    # enable internal address for in-process communication
+    enable_internal_addr: yes
+  extra_conf:
+    ucx:
+      tcp: null
+      nvlink: null
+      infiniband: null
+      rdmacm: null
+      cuda-copy: null
+      create-cuda-contex: null

@@ -80,6 +80,19 @@ async def test_cluster():
         [sys.executable, "-m", "mars.worker", "-s", supervisor_addr, "-f", path]
     )
 
+    for p in [r, w]:
+        try:
+            retcode = p.wait(1)
+        except subprocess.TimeoutExpired:
+            # supervisor & worker will run forever,
+            # timeout means everything goes well, at least looks well,
+            continue
+        else:
+            if retcode:
+                std_err = r.communicate()[1].decode()
+                p.kill()
+                raise RuntimeError("Start cluster failed, stderr: \n" + std_err)
+
     try:
         cluster_api = WebClusterAPI(web_addr)
         while True:

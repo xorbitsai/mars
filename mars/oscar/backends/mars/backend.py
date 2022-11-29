@@ -30,11 +30,20 @@ def build_pool_kwargs(n_process: int, kwargs: Dict):
 
         labels = kwargs["labels"]
         envs = kwargs["envs"]
+        external_address_schemes = kwargs["external_address_schemes"]
+        enable_internal_addresses = kwargs["enable_internal_addresses"]
         # sub-pools for IO(transfer and spill)
         for _ in range(n_io_process):
             if envs:  # pragma: no cover
                 envs.append(dict())
             labels.append("io")
+            if external_address_schemes:
+                # just use main process' scheme for IO process
+                external_address_schemes.append(external_address_schemes[0])
+            if enable_internal_addresses:
+                # just use main process' setting for IO process
+                enable_internal_addresses.append(enable_internal_addresses[0])
+
     return n_process, kwargs
 
 
@@ -42,8 +51,9 @@ def build_pool_kwargs(n_process: int, kwargs: Dict):
 class MarsActorBackend(BaseActorBackend):
     @staticmethod
     def name():
-        # return None because Mars is default scheme
-        return
+        # None means Mars is default scheme
+        # ucx can be recognized as Mars backend as well
+        return [None, "ucx"]
 
     @staticmethod
     def get_context_cls():

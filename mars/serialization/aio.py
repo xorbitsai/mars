@@ -15,7 +15,7 @@
 import asyncio
 import struct
 from io import BytesIO
-from typing import Any
+from typing import Any, Union, BinaryIO
 
 import cloudpickle
 import numpy as np
@@ -23,8 +23,7 @@ import numpy as np
 from ..utils import lazy_import
 from .core import serialize_with_spawn, deserialize
 
-cupy = lazy_import("cupy")
-cudf = lazy_import("cudf")
+rmm = lazy_import("rmm")
 
 DEFAULT_SERIALIZATION_VERSION = 1
 DEFAULT_SPAWN_THRESHOLD = 100
@@ -41,19 +40,8 @@ class AioSerializer:
             self._obj, spawn_threshold=DEFAULT_SPAWN_THRESHOLD
         )
 
-        def _is_cuda_buffer(buf):  # pragma: no cover
-            if cupy is not None and cudf is not None:
-                from cudf.core.buffer import Buffer as CPBuffer
-                from cupy import ndarray as cp_ndarray
-            else:
-                CPBuffer = cp_ndarray = None
-
-            if CPBuffer is not None and isinstance(buf, CPBuffer):
-                return True
-            elif cp_ndarray is not None and isinstance(buf, cp_ndarray):
-                return True
-            else:
-                return False
+        def _is_cuda_buffer(buf: Union["rmm.DeviceBuffer", BinaryIO]):
+            return hasattr(buf, "__cuda_array_interface__")
 
         is_cuda_buffers = [_is_cuda_buffer(buf) for buf in buffers]
         headers[0]["is_cuda_buffers"] = np.array(is_cuda_buffers)
@@ -72,11 +60,8 @@ class AioSerializer:
         header_bio.write(struct.pack("<Q", len(header)))
         # write compression
         header_bio.write(struct.pack("<H", self._compress))
-        # write header
-        header_bio.write(header)
 
-        out_buffers = list()
-        out_buffers.append(header_bio.getbuffer())
+        out_buffers = [header_bio.getbuffer(), header]
         out_buffers.extend(buffers)
 
         return out_buffers
@@ -89,6 +74,17 @@ MALFORMED_MSG = """\
 Received malformed data, please check Mars version on both side,
 if error occurs when using `mars.new_session('http://web_ip:web_port'),
 please check if web port is right."""
+
+
+def get_header_length(header_bytes: bytes):
+    version = struct.unpack("B", header_bytes[:1])[0]
+    # now we only have default version
+    assert version == DEFAULT_SERIALIZATION_VERSION, MALFORMED_MSG
+    # header length
+    header_length = struct.unpack("<Q", header_bytes[1:9])[0]
+    # compress
+    _ = struct.unpack("<H", header_bytes[9:])[0]
+    return header_length
 
 
 class AioDeserializer:
@@ -107,18 +103,12 @@ class AioDeserializer:
 
     async def _get_obj_header_bytes(self):
         try:
-            header_bytes = bytes(await self._file.read(11))
+            header_bytes = bytes(await self._readexactly(11))
         except ConnectionResetError:
             raise EOFError("Server may be closed")
         if len(header_bytes) == 0:
             raise EOFError("Received empty bytes")
-        version = struct.unpack("B", header_bytes[:1])[0]
-        # now we only have default version
-        assert version == DEFAULT_SERIALIZATION_VERSION, MALFORMED_MSG
-        # header length
-        header_length = struct.unpack("<Q", header_bytes[1:9])[0]
-        # compress
-        _ = struct.unpack("<H", header_bytes[9:])[0]
+        header_length = get_header_length(header_bytes)
         return await self._readexactly(header_length)
 
     async def _get_obj(self):

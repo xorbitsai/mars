@@ -202,6 +202,11 @@ class Server(ABC):
             "channel_type": self.channel_type,
         }
 
+    @classmethod
+    def parse_config(cls, config: dict) -> dict:
+        # skip parsing config by default
+        return dict()
+
     async def __aenter__(self):
         await self.start()
         return self
@@ -252,6 +257,11 @@ class Client(ABC):
         client: Client
             Client that holds a channel to communicate.
         """
+
+    @classmethod
+    def parse_config(cls, config: dict) -> dict:
+        # skip parsing config by default
+        return dict()
 
     @implements(Channel.send)
     async def send(self, message):

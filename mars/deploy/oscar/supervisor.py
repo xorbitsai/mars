@@ -67,6 +67,7 @@ class SupervisorCommandRunner(OscarCommandRunner):
             logging_conf=self.logging_conf,
             subprocess_start_method="forkserver" if os.name == "nt" else "spawn",
             metrics=self.config.get("metrics", {}),
+            oscar_config=self.config.get("oscar"),
         )
 
     async def start_services(self):

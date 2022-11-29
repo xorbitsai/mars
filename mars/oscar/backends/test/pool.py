@@ -25,7 +25,11 @@ from ..pool import ActorPoolType
 class TestMainActorPool(MainActorPool):
     @classmethod
     def get_external_addresses(
-        cls, address: str, n_process: int = None, ports: List[int] = None
+        cls,
+        address: str,
+        n_process: int = None,
+        ports: List[int] = None,
+        schemes: List[str] = None,
     ):
         if "://" in address:
             address = address.split("://", 1)[1]
@@ -114,7 +118,9 @@ class TestSubActorPool(SubActorPool):
         # create servers
         server_addresses = external_addresses + [gen_local_address(process_index)]
         server_addresses = sorted(set(server_addresses))
-        servers = await cls._create_servers(server_addresses, handle_channel)
+        servers = await cls._create_servers(
+            server_addresses, handle_channel, actor_pool_config.get_comm_config()
+        )
         cls._update_stored_addresses(servers, server_addresses, actor_pool_config, kw)
 
         # create pool

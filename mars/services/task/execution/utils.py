@@ -38,10 +38,11 @@ def get_band_resources_from_config(
     mem_bytes = mem_bytes // n_worker
     for _, devices in zip(range(n_worker), cuda_devices):
         worker_band_to_resource = dict()
-        worker_band_to_resource["numa-0"] = Resource(
-            num_cpus=worker_cpus, mem_bytes=mem_bytes
-        )
-        for i in devices:  # pragma: no cover
+        if worker_cpus > 0:
+            worker_band_to_resource["numa-0"] = Resource(
+                num_cpus=worker_cpus, mem_bytes=mem_bytes
+            )
+        for i in devices:
             worker_band_to_resource[f"gpu-{i}"] = Resource(num_gpus=1)
         bands_to_resource.append(worker_band_to_resource)
     return bands_to_resource

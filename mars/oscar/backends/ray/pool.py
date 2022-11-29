@@ -66,7 +66,11 @@ class RayMainActorPool(MainActorPoolBase):
 
     @classmethod
     def get_external_addresses(
-        cls, address: str, n_process: int = None, ports: List[int] = None
+        cls,
+        address: str,
+        n_process: int = None,
+        ports: List[int] = None,
+        schemes: List[str] = None,
     ):
         assert (
             not ports

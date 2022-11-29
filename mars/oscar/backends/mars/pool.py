@@ -17,6 +17,7 @@ import atexit
 import concurrent.futures as futures
 import configparser
 import contextlib
+import itertools
 import logging.config
 import multiprocessing
 import os
@@ -121,9 +122,13 @@ class SubpoolStatus:
 class MainActorPool(MainActorPoolBase):
     @classmethod
     def get_external_addresses(
-        cls, address: str, n_process: int = None, ports: List[int] = None
+        cls,
+        address: str,
+        n_process: int = None,
+        ports: List[int] = None,
+        schemes: List[str] = None,
     ):
-        """Get socket address for every process"""
+        """Get external address for every process"""
         if ":" in address:
             host, port = address.split(":", 1)
             port = int(port)
@@ -152,7 +157,14 @@ class MainActorPool(MainActorPoolBase):
                 ports = [0] * (n_process + 1)
             port = ports[0]
             sub_ports = ports[1:]
-        return [f"{host}:{port}" for port in [port] + sub_ports]
+        if not schemes:
+            prefix_iter = itertools.repeat("")
+        else:
+            prefix_iter = [f"{scheme}://" if scheme else "" for scheme in schemes]
+        return [
+            f"{prefix}{host}:{port}"
+            for port, prefix in zip([port] + sub_ports, prefix_iter)
+        ]
 
     @classmethod
     def gen_internal_address(

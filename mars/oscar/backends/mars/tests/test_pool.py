@@ -21,7 +21,7 @@ import time
 
 import pytest
 
-from .....tests.core import mock
+from .....tests.core import mock, require_ucx
 from .....utils import get_next_port
 from .... import create_actor_ref, Actor, kill_actor
 from ....context import get_context
@@ -560,6 +560,22 @@ async def test_errors():
             "127.0.0.1", pool_cls=MainActorPool, n_process=1, auto_recover="illegal"
         )
 
+    with pytest.raises(ValueError, match="external_address_schemes"):
+        _ = await create_actor_pool(
+            "127.0.0.1",
+            pool_cls=MainActorPool,
+            n_process=1,
+            external_address_schemes=["ucx"],
+        )
+
+    with pytest.raises(ValueError, match="enable_internal_addresses"):
+        _ = await create_actor_pool(
+            "127.0.0.1",
+            pool_cls=MainActorPool,
+            n_process=1,
+            enable_internal_addresses=[True],
+        )
+
 
 @pytest.mark.asyncio
 async def test_server_closed():
@@ -894,3 +910,63 @@ async def test_ref_sub_pool_actor():
             create_actor_ref(pool.external_address, ref2.uid)
         )
         assert not await ctx.has_actor(create_actor_ref(sub_address, ref2.uid))
+
+
+class TestUCXActor(Actor):
+    __test__ = False
+
+    def __init__(self, init_val: int):
+        self._init_val = init_val
+
+    def verify(self, enabled_internal_addr: bool):
+        router = Router.get_instance()
+        assert router.external_address.startswith("ucx")
+        assert len(router._mapping) > 0
+        if not enabled_internal_addr:
+            # no internal address
+            assert all(v is None for v in router._mapping.values())
+        else:
+            assert all(v is not None for v in router._mapping.values())
+
+    def add(self, n: int):
+        return self._init_val + n
+
+    async def foo(self, ref, n: int):
+        assert self.address != ref.address
+        return self._init_val + await ref.add(n)
+
+
+@require_ucx
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enable_internal_addr", [False, True])
+async def test_ucx(enable_internal_addr: bool):
+    start_method = (
+        os.environ.get("POOL_START_METHOD", "forkserver")
+        if sys.platform != "win32"
+        else None
+    )
+    pool = await create_actor_pool(
+        "127.0.0.1",
+        pool_cls=MainActorPool,
+        n_process=2,
+        subprocess_start_method=start_method,
+        external_address_schemes=["ucx"] * 3,
+        enable_internal_addresses=[enable_internal_addr] * 3,
+    )
+
+    async with pool:
+        ctx = get_context()
+        ref1 = await ctx.create_actor(
+            TestUCXActor,
+            1,
+            address=pool.external_address,
+            allocate_strategy=ProcessIndex(0),
+        )
+        await ref1.verify(enable_internal_addr)
+        ref2 = await ctx.create_actor(
+            TestUCXActor,
+            2,
+            address=pool.external_address,
+            allocate_strategy=ProcessIndex(1),
+        )
+        assert await ref1.foo(ref2, 3) == 6
