@@ -188,7 +188,9 @@ class DataFrameMapChunk(DataFrameOperand, DataFrameOperandMixin):
         )
         shape = self._kwargs.pop("shape", None)
 
-        if dtypes is not None:
+        if output_type == OutputType.df_or_series:
+            return self.new_df_or_series([df_or_series])
+        elif dtypes is not None:
             index = index if index is not None else pd.RangeIndex(-1)
             index_value = parse_index(
                 index, df_or_series, self._func, self._args, self._kwargs
@@ -253,6 +255,7 @@ class DataFrameMapChunk(DataFrameOperand, DataFrameOperandMixin):
         clean_up_func(op)
         inp = op.input
         out = op.outputs[0]
+        out_type = op.output_types[0]
 
         if inp.ndim == 2 and inp.chunk_shape[1] > 1:
             if has_unknown_shape(inp):
@@ -265,12 +268,30 @@ class DataFrameMapChunk(DataFrameOperand, DataFrameOperandMixin):
             arg_input_chunks.append(other_inp.chunks[0])
 
         out_chunks = []
-        nsplits = [[]] if out.ndim == 1 else [[], [out.shape[1]]]
-        pd_out_index = out.index_value.to_pandas()
+        if out_type == OutputType.dataframe:
+            nsplits = [[], [out.shape[1]]]
+            pd_out_index = out.index_value.to_pandas()
+        elif out_type == OutputType.series:
+            nsplits = [[]]
+            pd_out_index = out.index_value.to_pandas()
+        else:
+            # DataFrameOrSeries
+            nsplits = None
+            pd_out_index = None
         for chunk in inp.chunks:
             chunk_op = op.copy().reset_key()
             chunk_op.tileable_op_key = op.key
-            if op.output_types[0] == OutputType.dataframe:
+            if out_type == OutputType.df_or_series:
+                if inp.ndim == 2:
+                    collapse_axis = 1
+                else:
+                    collapse_axis = None
+                out_chunks.append(
+                    chunk_op.new_chunk(
+                        [chunk], index=chunk.index, collapse_axis=collapse_axis
+                    )
+                )
+            elif out_type == OutputType.dataframe:
                 if np.isnan(out.shape[0]):
                     shape = (np.nan, out.shape[1])
                 else:
@@ -304,7 +325,7 @@ class DataFrameMapChunk(DataFrameOperand, DataFrameOperandMixin):
                 nsplits[0].append(out_chunk.shape[0])
 
         params = out.params
-        params["nsplits"] = tuple(tuple(ns) for ns in nsplits)
+        params["nsplits"] = tuple(tuple(ns) for ns in nsplits) if nsplits else nsplits
         params["chunks"] = out_chunks
         new_op = op.copy()
         return new_op.new_tileables(op.inputs, kws=[params])

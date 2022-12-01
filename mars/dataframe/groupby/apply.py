@@ -86,9 +86,14 @@ class GroupByApply(
         if not in_data:
             if op.output_types[0] == OutputType.dataframe:
                 ctx[op.outputs[0].key] = build_empty_df(op.outputs[0].dtypes)
-            else:
+            elif op.output_types[0] == OutputType.series:
                 ctx[op.outputs[0].key] = build_empty_series(
                     op.outputs[0].dtype, name=out.name
+                )
+            else:
+                raise ValueError(
+                    "Chunk can not be empty except for dataframe/series, "
+                    "please specify output types"
                 )
             return
 
@@ -111,8 +116,6 @@ class GroupByApply(
                 )
             else:
                 applied.columns.name = None
-        else:
-            applied.name = out.name
         ctx[out.key] = applied
 
     @classmethod
@@ -127,7 +130,11 @@ class GroupByApply(
 
             new_op = op.copy().reset_key()
             new_op.tileable_op_key = op.key
-            if op.output_types[0] == OutputType.dataframe:
+            if op.output_types[0] == OutputType.df_or_series:
+                chunks.append(
+                    new_op.new_chunk(inp_chunks, index=c.index, collapse_axis=1)
+                )
+            elif op.output_types[0] == OutputType.dataframe:
                 chunks.append(
                     new_op.new_chunk(
                         inp_chunks,
@@ -216,6 +223,8 @@ class GroupByApply(
 
     def __call__(self, groupby, dtypes=None, dtype=None, name=None, index=None):
         in_df = groupby
+        if self.output_types and self.output_types[0] == OutputType.df_or_series:
+            return self.new_df_or_series([groupby])
         while in_df.op.output_types[0] not in (OutputType.dataframe, OutputType.series):
             in_df = in_df.inputs[0]
 
