@@ -272,6 +272,7 @@ def groupby_apply(
     dtype=None,
     name=None,
     index=None,
+    skip_infer=None,
     **kwargs,
 ):
     """
@@ -311,6 +312,9 @@ def groupby_apply(
     index : Index, default None
         Specify index of returned object. See `Notes` for more details.
 
+    skip_infer: bool, default False
+        Whether infer dtypes when dtypes or output_type is not specified.
+
     args, kwargs : tuple and dict
         Optional positional and keyword arguments to pass to `func`.
 
@@ -345,6 +349,8 @@ def groupby_apply(
     output_types = validate_output_types(
         output_types=output_types, output_type=output_type, object_type=object_type
     )
+    if output_types is None and skip_infer:
+        output_types = [OutputType.df_or_series]
 
     dtypes = make_dtypes(dtypes)
     dtype = make_dtype(dtype)

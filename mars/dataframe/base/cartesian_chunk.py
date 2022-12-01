@@ -249,7 +249,7 @@ class DataFrameCartesianChunk(DataFrameOperand, DataFrameOperandMixin):
         ctx[op.outputs[0].key] = op.func(left, right, *op.args, **(op.kwargs or dict()))
 
 
-def cartesian_chunk(left, right, func, args=(), **kwargs):
+def cartesian_chunk(left, right, func, skip_infer=False, args=(), **kwargs):
     output_type = kwargs.pop("output_type", None)
     output_types = kwargs.pop("output_types", None)
     object_type = kwargs.pop("object_type", None)
@@ -259,6 +259,8 @@ def cartesian_chunk(left, right, func, args=(), **kwargs):
     output_type = output_types[0] if output_types else None
     if output_type:
         output_types = [output_type]
+    elif skip_infer:
+        output_types = [OutputType.df_or_series]
     index = kwargs.pop("index", None)
     dtypes = kwargs.pop("dtypes", None)
     memory_scale = kwargs.pop("memory_scale", None)

@@ -357,7 +357,7 @@ class DataFrameMapChunk(DataFrameOperand, DataFrameOperandMixin):
         ctx[out.key] = op.func(inp, *args, **kwargs)
 
 
-def map_chunk(df_or_series, func, args=(), **kwargs):
+def map_chunk(df_or_series, func, skip_infer=False, args=(), **kwargs):
     """
     Apply function to each chunk.
 
@@ -365,6 +365,8 @@ def map_chunk(df_or_series, func, args=(), **kwargs):
     ----------
     func : function
         Function to apply to each chunk.
+    skip_infer: bool, default False
+        Whether infer dtypes when dtypes or output_type is not specified.
     args : tuple
         Positional arguments to pass to func in addition to the array/series.
     **kwargs
@@ -421,6 +423,8 @@ def map_chunk(df_or_series, func, args=(), **kwargs):
     output_type = output_types[0] if output_types else None
     if output_type:
         output_types = [output_type]
+    elif skip_infer:
+        output_types = [OutputType.df_or_series]
     index = kwargs.pop("index", None)
     dtypes = kwargs.pop("dtypes", None)
     with_chunk_index = kwargs.pop("with_chunk_index", False)
