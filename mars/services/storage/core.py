@@ -16,7 +16,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Union, Tuple
 
 from ... import oscar as mo
 from ...lib.aio import AioFileObject
@@ -55,7 +55,7 @@ class WrappedStorageFileObject(AioFileObject):
         level: StorageLevel,
         size: int,
         session_id: str,
-        data_key: str,
+        data_key: Union[str, Tuple],
         data_manager: mo.ActorRefType["DataManagerActor"],
         storage_handler: StorageBackend,
     ):
@@ -73,8 +73,8 @@ class WrappedStorageFileObject(AioFileObject):
     def __getattr__(self, item):
         return getattr(self._file, item)
 
-    def commit_once(self, key, offset, size):
-        self._sub_key_infos[key] = (offset, size)
+    def commit_once(self, sub_key, offset, size):
+        self._sub_key_infos[sub_key] = (offset, size)
 
     async def clean_up(self):
         self._file.close()
@@ -182,14 +182,18 @@ class InternalDataInfo:
 
 @dataslots
 @dataclass
-class SubInfos:
-    main_key: str
+class SubInfo:
+    store_key: str
     offset: int
     size: int
 
 
 class DataManagerActor(mo.Actor):
-    _data_key_to_info: Dict[tuple, List[InternalDataInfo]]
+    _data_key_to_infos: Dict[Tuple, List[InternalDataInfo]]
+    _data_info_list: Dict[Tuple, Dict]
+    _spill_strategy: Dict[Tuple, Any]
+    _sub_key_to_sub_info: Dict[Tuple, SubInfo]
+    _store_key_to_sub_infos: Dict[Tuple, Dict[Tuple, SubInfo]]
 
     def __init__(self, bands: List):
         from .spill import FIFOStrategy
@@ -197,27 +201,33 @@ class DataManagerActor(mo.Actor):
         # mapping key is (session_id, data_key)
         # mapping value is list of InternalDataInfo
         self._bands = bands
-        self._data_key_to_info = defaultdict(list)
+        self._data_key_to_infos = defaultdict(list)
         self._data_info_list = dict()
         self._spill_strategy = dict()
         # data key may be a tuple in shuffle cases,
-        # we record the mapping from main key to sub keys
+        # we record the mapping from main key to sub keys,
+        # it's used when decref mapper data using main key
         self._main_key_to_sub_keys = defaultdict(set)
         # we may store multiple small data into one file,
         # it records offset and size.
-        self._sub_key_to_store_key = dict()
-        self._key_to_sub_infos = dict()
+        self._sub_key_to_sub_info = dict()
+        self._store_key_to_sub_infos = dict()
         for level in StorageLevel.__members__.values():
             for band_name in bands:
                 self._data_info_list[level, band_name] = dict()
                 self._spill_strategy[level, band_name] = FIFOStrategy(level)
 
-    def _get_data_infos(
-        self, session_id: str, data_key: str, band_name: str, error: str
-    ) -> Union[List[DataInfo], None]:
-        if (session_id, data_key) in self._data_key_to_info:
+    @mo.extensible
+    def get_data_infos(
+        self,
+        session_id: str,
+        data_key: Union[str, Tuple],
+        band_name: str,
+        error: str = "raise",
+    ) -> Optional[Union[List[DataInfo], Dict]]:
+        if (session_id, data_key) in self._data_key_to_infos:
             available_infos = []
-            for info in self._data_key_to_info[session_id, data_key]:
+            for info in self._data_key_to_infos[session_id, data_key]:
                 info_band = info.data_info.band
                 if info_band.startswith("gpu-"):  # pragma: no cover
                     # not available for different GPU bands
@@ -233,48 +243,32 @@ class DataManagerActor(mo.Actor):
                 return
 
     @mo.extensible
-    def get_data_infos(
-        self, session_id: str, data_key: str, band_name: str, error: str = "raise"
-    ) -> Union[List[DataInfo], Dict]:
-        if (session_id, data_key) in self._main_key_to_sub_keys:
-            key_to_infos = dict()
-            # if data_key is a main key, we return a dict contains all sub keys' info,
-            # it occurs mostly when deleting all shuffle data using main key.
-            for sub_key in self._main_key_to_sub_keys[(session_id, data_key)]:
-                infos = self._get_data_infos(session_id, sub_key, band_name, error)
-                if infos:
-                    key_to_infos[sub_key] = infos
-            return key_to_infos
-        else:
-            return self._get_data_infos(session_id, data_key, band_name, error)
-
-    @mo.extensible
     def get_data_info(
         self,
         session_id: str,
-        data_key: str,
+        data_key: Union[str, Tuple],
         band_name: str = None,
         error: str = "raise",
     ) -> Union[DataInfo, None]:
-        store_info = None
-        if (session_id, data_key) in self._sub_key_to_store_key:
-            store_info = self._sub_key_to_store_key[(session_id, data_key)]
-            data_key = store_info.main_key
+        sub_info = None
+        if (session_id, data_key) in self._sub_key_to_sub_info:
+            sub_info = self._sub_key_to_sub_info[(session_id, data_key)]
+            data_key = sub_info.store_key
 
         # if the data is stored in multiply levels,
         # return the lowest level info
-        infos = self._get_data_infos(session_id, data_key, band_name, error)
+        infos = self.get_data_infos(session_id, data_key, band_name, error)
         if not infos:
             return
         info = sorted(infos, key=lambda x: x.level)[0]
-        if store_info is not None:
+        if sub_info is not None:
             return DataInfo(
                 info.object_id,
                 info.level,
-                store_info.size,
-                store_info.size,
+                sub_info.size,
+                sub_info.size,
                 info.band,
-                store_info.offset,
+                sub_info.offset,
             )
         else:
             return info
@@ -283,60 +277,62 @@ class DataManagerActor(mo.Actor):
     def put_data_info(
         self,
         session_id: str,
-        data_key: str,
+        data_key: Union[str, Tuple],
         data_info: DataInfo,
         object_info: ObjectInfo = None,
         sub_key_infos: Dict = None,
     ):
         info = InternalDataInfo(data_info, object_info)
-        self._data_key_to_info[(session_id, data_key)].append(info)
+        self._data_key_to_infos[(session_id, data_key)].append(info)
         self._data_info_list[data_info.level, data_info.band][
             (session_id, data_key)
         ] = object_info
         self._spill_strategy[data_info.level, data_info.band].record_put_info(
             (session_id, data_key), data_info.store_size
         )
-        if isinstance(data_key, tuple):
-            self._main_key_to_sub_keys[(session_id, data_key[0])].update([data_key])
         if sub_key_infos:
             for key, (offset, size) in sub_key_infos.items():
-                self._sub_key_to_store_key[(session_id, key)] = SubInfos(
+                self._sub_key_to_sub_info[(session_id, key)] = SubInfo(
                     data_key, offset, size
                 )
-            self._key_to_sub_infos[(session_id, data_key)] = sub_key_infos
+            self._store_key_to_sub_infos[(session_id, data_key)] = sub_key_infos
+        if isinstance(data_key, tuple):
+            self._main_key_to_sub_keys[(session_id, data_key[0])].add(data_key)
 
     @mo.extensible
     def delete_data_info(
-        self, session_id: str, data_key: str, level: StorageLevel, band_name: str
+        self,
+        session_id: str,
+        data_key: Union[str, Tuple],
+        level: StorageLevel,
+        band_name: str,
     ):
-        if (session_id, data_key) in self._data_key_to_info:
+        if (session_id, data_key) in self._data_key_to_infos:
             self._data_info_list[level, band_name].pop((session_id, data_key))
             self._spill_strategy[level, band_name].record_delete_info(
                 (session_id, data_key)
             )
-            infos = self._data_key_to_info[(session_id, data_key)]
+            infos = self._data_key_to_infos[(session_id, data_key)]
             rest = [info for info in infos if info.data_info.level != level]
-            if isinstance(data_key, tuple):
-                if (
-                    len(self._main_key_to_sub_keys[(session_id, data_key[0])]) == 0
-                ):  # pragma: no cover
-                    del self._main_key_to_sub_keys[(session_id, data_key[0])]
             if len(rest) == 0:
-                del self._data_key_to_info[(session_id, data_key)]
+                del self._data_key_to_infos[(session_id, data_key)]
             else:  # pragma: no cover
-                self._data_key_to_info[(session_id, data_key)] = rest
+                self._data_key_to_infos[(session_id, data_key)] = rest
 
     @mo.extensible
-    def get_store_key(self, session_id: str, data_key: str):
-        if (session_id, data_key) in self._sub_key_to_store_key:
-            return self._sub_key_to_store_key[(session_id, data_key)].main_key
+    def get_store_key(self, session_id: str, data_key: Union[str, Tuple, List]):
+        if (session_id, data_key) in self._sub_key_to_sub_info:
+            return self._sub_key_to_sub_info[(session_id, data_key)].store_key
+        elif (session_id, data_key) in self._main_key_to_sub_keys:
+            # only into when delete mapper main key
+            return list(self._main_key_to_sub_keys[(session_id, data_key)])
         else:
             return data_key
 
     @mo.extensible
     def get_sub_infos(self, session_id: str, store_key: str):
-        if (session_id, store_key) in self._key_to_sub_infos:
-            return self._key_to_sub_infos[(session_id, store_key)]
+        if (session_id, store_key) in self._store_key_to_sub_infos:
+            return self._store_key_to_sub_infos[(session_id, store_key)]
         else:
             return None
 

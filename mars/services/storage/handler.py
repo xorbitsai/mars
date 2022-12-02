@@ -266,6 +266,7 @@ class StorageHandlerActor(mo.Actor):
         object_id: Any,
         level: StorageLevel,
     ):
+        data_key = await self._data_manager_ref.get_store_key(session_id, data_key)
         await self._data_manager_ref.delete_data_info(
             session_id, data_key, level, self._band_name
         )
@@ -307,8 +308,13 @@ class StorageHandlerActor(mo.Actor):
             data_keys.append(
                 self._data_manager_ref.get_store_key.delay(session_id, data_key)
             )
-        data_keys = await self._data_manager_ref.get_store_key.batch(*data_keys)
-        data_keys = set(key for key in data_keys if key is not None)
+        store_keys = await self._data_manager_ref.get_store_key.batch(*data_keys)
+        data_keys = set()
+        for k in store_keys:
+            if isinstance(k, list):
+                data_keys.update(set(k))
+            else:
+                data_keys.add(k)
 
         infos_list = await self._data_manager_ref.get_data_infos.batch(
             *[
