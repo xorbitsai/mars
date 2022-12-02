@@ -151,17 +151,30 @@ async def create_supervisor_actor_pool(
     modules: List[str] = None,
     ports: List[int] = None,
     subprocess_start_method: str = None,
+    oscar_config: dict = None,
     **kwargs,
 ):
     logging_conf = _config_logging(**kwargs)
     kwargs["logging_conf"] = logging_conf
+    if oscar_config:
+        numa_config = oscar_config.get("numa", dict())
+        numa_external_address_scheme = numa_config.get("external_addr_scheme", None)
+        numa_enable_internal_address = numa_config.get("enable_internal_addr", True)
+        external_address_schemes = [numa_external_address_scheme] * (n_process + 1)
+        enable_internal_addresses = [numa_enable_internal_address] * (n_process + 1)
+        extra_conf = oscar_config["extra_conf"]
+    else:
+        external_address_schemes = enable_internal_addresses = extra_conf = None
     return await mo.create_actor_pool(
         address,
         n_process=n_process,
         ports=ports,
+        external_address_schemes=external_address_schemes,
+        enable_internal_addresses=enable_internal_addresses,
         modules=modules,
         subprocess_start_method=subprocess_start_method,
         suspend_sigint=_need_suspend_sigint(),
+        extra_conf=extra_conf,
         **kwargs,
     )
 
@@ -174,6 +187,7 @@ async def create_worker_actor_pool(
     ports: List[int] = None,
     cuda_devices: List[int] = None,
     subprocess_start_method: str = None,
+    oscar_config: dict = None,
     **kwargs,
 ):
     logging_conf = _config_logging(**kwargs)
@@ -186,6 +200,15 @@ async def create_worker_actor_pool(
     envs = []
     labels = ["main"]
 
+    oscar_config = oscar_config or dict()
+    numa_config = oscar_config.get("numa", dict())
+    numa_external_address_scheme = numa_config.get("external_addr_scheme")
+    numa_enable_internal_address = numa_config.get("enable_internal_addr")
+    gpu_config = oscar_config.get("gpu", dict())
+    gpu_external_address_scheme = gpu_config.get("external_addr_scheme")
+    gpu_enable_internal_address = gpu_config.get("enable_internal_addr")
+    extra_conf = oscar_config.get("extra_conf", dict())
+
     if cuda_devices is None:  # pragma: no cover
         env_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
         if not env_devices:
@@ -193,17 +216,29 @@ async def create_worker_actor_pool(
         else:
             cuda_devices = [int(i) for i in env_devices.split(",")]
 
+    external_address_schemes = [numa_external_address_scheme]
+    enable_internal_addresses = [numa_enable_internal_address]
     i_gpu = iter(sorted(cuda_devices))
     for band, resource in band_to_resource.items():
-        if band.startswith("gpu"):  # pragma: no cover
+        if band.startswith("gpu"):
             idx = str(next(i_gpu))
             envs.append({"CUDA_VISIBLE_DEVICES": idx})
             labels.append(f"gpu-{idx}")
+            external_address_schemes.append(gpu_external_address_scheme)
+            enable_internal_addresses.append(gpu_enable_internal_address)
         else:
             assert band.startswith("numa")
             num_cpus = int(resource.num_cpus)
-            envs.extend([{"CUDA_VISIBLE_DEVICES": "-1"} for _ in range(num_cpus)])
+            if cuda_devices:
+                # if has cuda device, disable all cuda devices for numa processes
+                envs.extend([{"CUDA_VISIBLE_DEVICES": "-1"} for _ in range(num_cpus)])
             labels.extend([band] * num_cpus)
+            external_address_schemes.extend(
+                [numa_external_address_scheme for _ in range(num_cpus)]
+            )
+            enable_internal_addresses.extend(
+                [numa_enable_internal_address for _ in range(num_cpus)]
+            )
 
     return await mo.create_actor_pool(
         address,
@@ -215,5 +250,8 @@ async def create_worker_actor_pool(
         modules=modules,
         subprocess_start_method=subprocess_start_method,
         suspend_sigint=_need_suspend_sigint(),
+        external_address_schemes=external_address_schemes,
+        enable_internal_addresses=enable_internal_addresses,
+        extra_conf=extra_conf,
         **kwargs,
     )

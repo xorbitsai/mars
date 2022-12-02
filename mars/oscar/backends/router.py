@@ -23,7 +23,13 @@ class Router:
     Router provides mapping from external address to internal address.
     """
 
-    __slots__ = "_curr_external_addresses", "_local_mapping", "_mapping", "_cache_local"
+    __slots__ = (
+        "_curr_external_addresses",
+        "_local_mapping",
+        "_mapping",
+        "_comm_config",
+        "_cache_local",
+    )
 
     _instance: "Router" = None
 
@@ -45,6 +51,7 @@ class Router:
         external_addresses: List[str],
         local_address: Optional[str],
         mapping: Dict[str, str] = None,
+        comm_config: dict = None,
     ):
         self._curr_external_addresses = external_addresses
         self._local_mapping = dict()
@@ -53,6 +60,7 @@ class Router:
         if mapping is None:
             mapping = dict()
         self._mapping = mapping
+        self._comm_config = comm_config or dict()
         self._cache_local = threading.local()
 
     @property
@@ -71,6 +79,7 @@ class Router:
         self._curr_external_addresses.extend(router._curr_external_addresses)
         self._local_mapping.update(router._local_mapping)
         self._mapping.update(router._mapping)
+        self._comm_config.update(router._comm_config)
         self._cache_local = threading.local()
 
     def remove_router(self, router: "Router"):
@@ -116,6 +125,9 @@ class Router:
         local_address = (
             self._curr_external_addresses[0] if self._curr_external_addresses else None
         )
+        config = client_type.parse_config(self._comm_config)
+        if config:
+            kw["config"] = config
         client = await client_type.connect(address, local_address=local_address, **kw)
         if cached:
             self._cache[external_address, from_who] = client

@@ -45,6 +45,7 @@ from ..utils import lazy_import
 cupy = lazy_import("cupy")
 cudf = lazy_import("cudf")
 ray = lazy_import("ray")
+ucx = lazy_import("ucp")
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +178,13 @@ def require_ray(func):
     if pytest:
         func = pytest.mark.ray(func)
     func = pytest.mark.skipif(ray is None, reason="ray not installed")(func)
+    return func
+
+
+def require_ucx(func):
+    if pytest:
+        func = pytest.mark.ucx(func)
+    func = pytest.mark.skipif(ucx is None, reason="ucx not installed")(func)
     return func
 
 

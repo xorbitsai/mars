@@ -209,7 +209,7 @@ class SocketServer(_BaseSocketServer):
         if "start_serving" not in config:
             config["start_serving"] = False
 
-        async def handle_connection(reader, writer):
+        async def handle_connection(reader: StreamReader, writer: StreamWriter):
             # create a channel when client connected
             return await server.on_connected(
                 reader, writer, local_address=server.address

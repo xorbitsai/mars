@@ -41,11 +41,13 @@ from .... import remote as mr
 from ....config import option_context
 from ....core.context import get_context
 from ....lib.aio import new_isolation
+from ....oscar.backends.router import Router
 from ....storage import StorageLevel
 from ....services.storage import StorageAPI
 from ....services.task.supervisor.task import TaskProcessor
 from ....tensor.arithmetic.add import TensorAdd
-from ....tests.core import mock, check_dict_structure_same, DICT_NOT_EMPTY
+from ....tests.core import mock, check_dict_structure_same, DICT_NOT_EMPTY, require_cupy
+from ....utils import lazy_import
 from ..local import new_cluster, _load_config
 from ..session import (
     get_default_async_session,
@@ -1141,3 +1143,144 @@ def test_naive_code_file():
             except psutil.NoSuchProcess:
                 pass
             raise
+
+
+ucp = lazy_import("ucp")
+_OSCAR_CONF_TEMPLATE = """
+"@inherits": '@default'
+oscar:
+  numa:
+    external_addr_scheme: {scheme}
+    enable_internal_addr: {enable_inaddr}
+"""
+
+
+schemes = [None]
+if ucp is not None:
+    schemes.append("ucx")
+
+
+@pytest.mark.parametrize("scheme", schemes)
+@pytest.mark.parametrize("enable_inaddr", [False, True])
+@pytest.mark.parametrize("manner", ["numa", "all", "config_file"])
+def test_oscar_configs(scheme, enable_inaddr, manner):
+    def test(sess):
+        def verify():
+            router = Router.get_instance()
+            prefix = "" if not scheme else f"{scheme}://"
+            assert router._mapping
+            assert all(addr.startswith(prefix) for addr in router._mapping)
+            if enable_inaddr:
+                assert all(inaddr is not None for inaddr in router._mapping.values())
+            else:
+                assert all(inaddr is None for inaddr in router._mapping.values())
+
+        with sess:
+            sess.execute(*[mr.spawn(verify) for _ in range(4)])
+
+        sess.stop_server()
+        assert get_default_async_session() is None
+
+    if manner == "numa":
+        session = new_session(
+            n_cpu=2,
+            web=False,
+            cuda_devices=None,
+            numa_external_addr_scheme=scheme,
+            numa_enable_internal_addr=enable_inaddr,
+            oscar_extra_conf={"ucx": {"tcp": True}},
+        )
+        test(session)
+    elif manner == "all":
+        session = new_session(
+            n_cpu=2,
+            web=False,
+            cuda_devices=None,
+            external_addr_scheme=scheme,
+            enable_internal_addr=enable_inaddr,
+        )
+        test(session)
+    else:
+        scheme_str = "" if not scheme else scheme
+        enable_inaddr_str = "yes" if enable_inaddr else "no"
+        config_content = _OSCAR_CONF_TEMPLATE.format(
+            scheme=scheme_str, enable_inaddr=enable_inaddr_str
+        )
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".yml") as f:
+            f.write(config_content)
+            f.flush()
+            session = new_session(config=f.name, n_cpu=2, web=False, cuda_devices=None)
+
+            test(session)
+
+
+@require_cupy
+@pytest.mark.parametrize("scheme", schemes)
+@pytest.mark.parametrize("enable_inaddr", [False, True])
+@pytest.mark.parametrize("manner", ["gpu", "all"])
+def test_gpu_oscar_configs(scheme, enable_inaddr, manner):
+    def test(sess):
+        def verify():
+            router = Router.get_instance()
+            prefix = "" if not scheme else f"{scheme}://"
+            # only verify GPU process
+            assert {addr for addr in router._mapping if addr == router.external_address}
+            assert all(
+                addr.startswith(prefix)
+                for addr in router._mapping
+                if addr == router.external_address
+            )
+            if enable_inaddr:
+                assert all(
+                    inaddr is not None
+                    for addr, inaddr in router._mapping.items()
+                    if addr == router.external_address
+                )
+            else:
+                assert all(
+                    inaddr is None
+                    for addr, inaddr in router._mapping.items()
+                    if addr == router.external_address
+                )
+
+        with sess:
+            sess.execute(*[mr.spawn(verify, gpu=True) for _ in range(2)])
+
+        sess.stop_server()
+        assert get_default_async_session() is None
+
+    if manner == "gpu":
+        session = new_session(
+            n_cpu=2,
+            web=False,
+            cuda_devices=[0],
+            gpu_external_addr_scheme=scheme,
+            gpu_enable_internal_addr=enable_inaddr,
+            oscar_extra_conf={"ucx": {"create-cuda-contex": True}},
+        )
+        test(session)
+    else:
+        session = new_session(
+            n_cpu=2,
+            web=False,
+            cuda_devices=[0],
+            external_addr_scheme=scheme,
+            enable_internal_addr=enable_inaddr,
+        )
+        test(session)
+
+
+def test_default_oscar_config():
+    session = new_session(n_cpu=2, web=False, cuda_devices=None)
+
+    def verify():
+        router = Router.get_instance()
+        assert router._mapping
+        # enabled inner address by default
+        assert all(inaddr is not None for inaddr in router._mapping.values())
+
+    with session:
+        session.execute(*[mr.spawn(verify) for _ in range(4)])
+
+    session.stop_server()
+    assert get_default_async_session() is None

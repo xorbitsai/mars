@@ -368,7 +368,7 @@ def lazy_import(
     prefix_name = name.split(".", 1)[0]
     globals = globals or inspect.currentframe().f_back.f_globals
 
-    class LazyModule(object):
+    class LazyModule:
         def __init__(self):
             self._on_loads = []
 
