@@ -606,8 +606,11 @@ class StorageManagerActor(mo.StatelessActor):
         from ..cluster import DiskInfo
 
         disk_infos = []
-        if self._cluster_api is not None and "filesystem" in self._init_params["numa-0"]:
-            if self._init_params["numa-0"]['filesystem']['level'] == StorageLevel.DISK:
+        if (
+            self._cluster_api is not None
+            and "filesystem" in self._init_params["numa-0"]
+        ):
+            if self._init_params["numa-0"]["filesystem"]["level"] == StorageLevel.DISK:
                 params = self._init_params["numa-0"]["filesystem"]
                 size = params["size"]
                 for path in params["root_dirs"]:
