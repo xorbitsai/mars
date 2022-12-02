@@ -14,9 +14,9 @@
 
 from enum import Enum
 from types import TracebackType
-from typing import Any, Type
+from typing import Any, Type, List
 
-from ..core import ActorRef
+from ..core import ActorRef, BufferRef, FileObjectRef
 
 DEFAULT_PROTOCOL: int = 0
 
@@ -31,6 +31,8 @@ class MessageType(Enum):
     send = 7
     tell = 8
     cancel = 9
+    copyto_buffers = 10
+    copyto_fileobjects = 11
 
 class ControlMessageType(Enum):
     stop = 0
@@ -39,6 +41,8 @@ class ControlMessageType(Enum):
     get_config = 3
     wait_pool_recovered = 4
     add_sub_pool_actor = 5
+    # the new channel created is for data transfer only
+    switch_to_transfer = 6
 
 class _MessageBase:
     message_type: MessageType
@@ -210,5 +214,31 @@ class CancelMessage(_MessageBase):
 class DeserializeMessageFailed(RuntimeError):
     def __init__(self, message_id: bytes): ...
     def __str__(self): ...
+
+class CopytoBuffersMessage(_MessageBase):
+    message_type = MessageType.copyto_buffers
+
+    buffer_refs: List[BufferRef]
+
+    def __int__(
+        self,
+        message_id: bytes = None,
+        buffer_refs: List[BufferRef] = None,
+        protocol: int = DEFAULT_PROTOCOL,
+        message_trace: list = None,
+    ): ...
+
+class CopytoFileObjectsMessage(_MessageBase):
+    message_type = MessageType.copyto_file_objects
+
+    fileobj_refs: List[FileObjectRef]
+
+    def __int__(
+        self,
+        message_id: bytes = None,
+        fileobj_refs: List[FileObjectRef] = None,
+        protocol: int = DEFAULT_PROTOCOL,
+        message_trace: list = None,
+    ): ...
 
 def new_message_id() -> bytes: ...

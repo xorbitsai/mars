@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import asyncio
-import contextlib
 import sys
 
 from .file import AioFileObject, AioFilesystem

@@ -1893,3 +1893,24 @@ def clean_mars_tmp_dir():
                 # on windows platform, raise Permission Error
                 _windows: bool = sys.platform.startswith("win")
                 shutil.rmtree(mars_tmp_dir, ignore_errors=_windows)
+
+
+_cupy = lazy_import("cupy")
+_rmm = lazy_import("rmm")
+
+
+def is_cuda_buffer(cuda_buffer: Union["_cupy.ndarray", "_rmm.DeviceBuffer"]) -> bool:
+    return hasattr(cuda_buffer, "__cuda_array_interface__")
+
+
+def convert_to_cupy_ndarray(
+    cuda_buffer: Union["_cupy.ndarray", "_rmm.DeviceBuffer"]
+) -> "_cupy.ndarray":
+    if isinstance(cuda_buffer, _cupy.ndarray):
+        return cuda_buffer
+
+    size = cuda_buffer.nbytes
+    data = cuda_buffer.__cuda_array_interface__["data"][0]
+    memory = _cupy.cuda.UnownedMemory(data, size, cuda_buffer)
+    ptr = _cupy.cuda.MemoryPointer(memory, 0)
+    return _cupy.ndarray(shape=size, dtype="u1", memptr=ptr)

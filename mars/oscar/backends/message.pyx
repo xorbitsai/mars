@@ -20,7 +20,7 @@ from ...lib.tblib import pickling_support
 from ...serialization.core cimport Serializer
 from ..._utils cimport new_random_id
 from ...utils import wrap_exception
-from ..core cimport ActorRef
+from ..core cimport ActorRef, BufferRef, FileObjectRef
 
 # make sure traceback can be pickled
 pickling_support.install()
@@ -40,6 +40,8 @@ class MessageType(Enum):
     send = 7
     tell = 8
     cancel = 9
+    copyto_buffers = 10
+    copyto_fileobjects = 11
 
 
 class ControlMessageType(Enum):
@@ -49,6 +51,8 @@ class ControlMessageType(Enum):
     get_config = 3
     wait_pool_recovered = 4
     add_sub_pool_actor = 5
+    # the new channel created is for data transfer only
+    switch_to_transfer = 6
 
 
 cdef class _MessageSerialItem:
@@ -484,6 +488,85 @@ cdef class CancelMessage(_MessageBase):
         self.cancel_message_id = serialized[-1]
 
 
+cdef class CopytoBuffersMessage(_MessageBase):
+    message_type = MessageType.copyto_buffers
+
+    cdef:
+        public list buffer_refs
+
+    def __init__(
+        self,
+        bytes message_id = None,
+        list buffer_refs = None,
+        int protocol = _DEFAULT_PROTOCOL,
+        list message_trace = None,
+    ):
+        _MessageBase.__init__(
+            self,
+            message_id,
+            protocol=protocol,
+            message_trace=message_trace
+        )
+        self.buffer_refs = buffer_refs
+
+    cdef _MessageSerialItem serial(self):
+        cdef _MessageSerialItem item = _MessageBase.serial(self)
+        for buffer_ref in self.buffer_refs:
+            item.serialized += (
+                buffer_ref.address, buffer_ref.uid
+            )
+        item.serialized += (len(self.buffer_refs),)
+        return item
+
+    cdef deserial_members(self, tuple serialized, list subs):
+        _MessageBase.deserial_members(self, serialized, subs)
+        size = serialized[-1]
+        refs = []
+        for address, uid in zip(serialized[-size * 2 - 1: -1: 2], serialized[-size * 2::2]):
+            refs.append(BufferRef(address, uid))
+        assert len(refs) == size
+        self.buffer_refs = refs
+
+cdef class CopytoFileObjectsMessage(_MessageBase):
+    message_type = MessageType.copyto_fileobjects
+
+    cdef:
+        public list fileobj_refs
+
+    def __init__(
+        self,
+        bytes message_id = None,
+        list fileobj_refs = None,
+        int protocol = _DEFAULT_PROTOCOL,
+        list message_trace = None,
+    ):
+        _MessageBase.__init__(
+            self,
+            message_id,
+            protocol=protocol,
+            message_trace=message_trace
+        )
+        self.fileobj_refs = fileobj_refs
+
+    cdef _MessageSerialItem serial(self):
+        cdef _MessageSerialItem item = _MessageBase.serial(self)
+        for fileobj_ref in self.fileobj_refs:
+            item.serialized += (
+                fileobj_ref.address, fileobj_ref.uid
+            )
+        item.serialized += (len(self.fileobj_refs),)
+        return item
+
+    cdef deserial_members(self, tuple serialized, list subs):
+        _MessageBase.deserial_members(self, serialized, subs)
+        size = serialized[-1]
+        refs = []
+        for address, uid in zip(serialized[-size * 2 - 1: -1: 2], serialized[-size * 2::2]):
+            refs.append(FileObjectRef(address, uid))
+        assert len(refs) == size
+        self.fileobj_refs = refs
+
+
 cdef dict _message_type_to_message_cls = {
     MessageType.control.value: ControlMessage,
     MessageType.result.value: ResultMessage,
@@ -495,6 +578,8 @@ cdef dict _message_type_to_message_cls = {
     MessageType.send.value: SendMessage,
     MessageType.tell.value: TellMessage,
     MessageType.cancel.value: CancelMessage,
+    MessageType.copyto_buffers.value: CopytoBuffersMessage,
+    MessageType.copyto_fileobjects.value: CopytoFileObjectsMessage,
 }
 
 
