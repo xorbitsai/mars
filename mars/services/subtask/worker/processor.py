@@ -363,14 +363,13 @@ class SubtaskProcessor:
     async def _write_aggregated_mapper_data(
         self, key_and_band: Tuple, objects: List, data_keys: List
     ):
-        serialization_tasks = [
-            asyncio.create_task(AioSerializer(obj).run()) for obj in objects
-        ]
-        memory_size = sum(
-            await asyncio.gather(
-                *[asyncio.to_thread(calc_data_size, obj) for obj in objects]
-            )
-        )
+        serialization_tasks = [AioSerializer(obj).run() for obj in objects]
+
+        def calc_memory_size(objs):
+            return sum(calc_data_size(obj) for obj in objs)
+
+        memory_size = await asyncio.to_thread(calc_memory_size, objects)
+
         buffer_list = await asyncio.gather(*serialization_tasks)
         sizes = [
             sum(b.size if hasattr(b, "size") else len(b) for b in buf)
@@ -707,7 +706,7 @@ class SubtaskProcessorActor(mo.Actor):
         await context.init()
         set_context(context)
 
-    async def run(self, subtask: Subtask, wait_post_run: bool = True):
+    async def run(self, subtask: Subtask):
         logger.info(
             "Start to run subtask: %r on %s. chunk graph contains %s",
             subtask,
