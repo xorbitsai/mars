@@ -180,8 +180,9 @@ class StorageAPI(AbstractStorageAPI):
 
         Parameters
         ----------
-        data_key: str
-            data key to fetch to current worker with specific level
+        data_key: str or tuple
+            data key(tuple when is shuffle key) to fetch to current worker
+            with specific level.
         level: StorageLevel
             the storage level to put into, MEMORY as default
         band_name: BandType
