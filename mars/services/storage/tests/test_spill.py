@@ -20,6 +20,7 @@ import tempfile
 import numpy as np
 import pytest
 
+from ...cluster import MockClusterAPI
 from .... import oscar as mo
 from ....storage import StorageLevel, PlasmaStorage
 from ....utils import calc_data_size
@@ -134,6 +135,19 @@ async def test_spill(create_actors):
 
     plasma_list = await plasma_handler.list()
     assert len(plasma_list) == len(memory_object_list)
+
+
+@pytest.mark.asyncio
+async def test_disk_info(create_actors):
+    worker_address, _, _ = create_actors
+    _ = await MockClusterAPI.create(address=worker_address)
+    storage_manager = await mo.actor_ref(
+        uid=StorageManagerActor.default_uid(), address=worker_address
+    )
+    init_params = (await storage_manager.get_client_params())["numa-0"]
+    assert "filesystem" in init_params
+    assert "level" in init_params["filesystem"]
+    assert init_params["filesystem"]["level"] == StorageLevel.DISK
 
 
 class DelayPutStorageHandler(StorageHandlerActor):
