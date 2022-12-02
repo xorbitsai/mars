@@ -279,24 +279,30 @@ class StorageHandlerActor(mo.Actor):
             raise ValueError("error must be raise or ignore")
 
         data_key = await self._data_manager_ref.get_store_key(session_id, data_key)
-        all_infos = await self._data_manager_ref.get_data_infos(
-            session_id, data_key, self._band_name, error
-        )
-        if not all_infos:
-            return
+        if isinstance(data_key, list):
+            # delete mapper main key
+            data_keys = data_key
+        else:
+            data_keys = [data_key]
+        for data_key in data_keys:
+            all_infos = await self._data_manager_ref.get_data_infos(
+                session_id, data_key, self._band_name, error
+            )
+            if not all_infos:
+                return
 
-        key_to_infos = (
-            all_infos if isinstance(all_infos, dict) else {data_key: all_infos}
-        )
+            key_to_infos = (
+                all_infos if isinstance(all_infos, dict) else {data_key: all_infos}
+            )
 
-        for key, infos in key_to_infos.items():
-            for info in infos:
-                level = info.level
-                await self._data_manager_ref.delete_data_info(
-                    session_id, key, level, self._band_name
-                )
-                await self._clients[level].delete(info.object_id)
-                await self._quota_refs[level].release_quota(info.store_size)
+            for key, infos in key_to_infos.items():
+                for info in infos:
+                    level = info.level
+                    await self._data_manager_ref.delete_data_info(
+                        session_id, key, level, self._band_name
+                    )
+                    await self._clients[level].delete(info.object_id)
+                    await self._quota_refs[level].release_quota(info.store_size)
 
     @delete.batch
     async def batch_delete(self, args_list, kwargs_list):
