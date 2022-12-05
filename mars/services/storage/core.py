@@ -336,8 +336,8 @@ class DataManagerActor(mo.Actor):
         else:
             return None
 
-    def list(self, level: StorageLevel, ban_name: str):
-        return list(self._data_info_list[level, ban_name].keys())
+    def list(self, level: StorageLevel, band_name: str):
+        return list(self._data_info_list[level, band_name].keys())
 
     @mo.extensible
     def pin(self, session_id, data_key, band_name, error="raise"):
