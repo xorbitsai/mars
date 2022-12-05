@@ -547,7 +547,7 @@ class StorageHandlerActor(mo.Actor):
                 )
             fetch_keys.extend(list(keys))
 
-        await asyncio.gather(*transfer_tasks)
+        yield asyncio.gather(*transfer_tasks)
 
         append_bands_delays = []
         for data_key in fetch_keys:
@@ -562,7 +562,7 @@ class StorageHandlerActor(mo.Actor):
             )
         if append_bands_delays:
             await meta_api.add_chunk_bands.batch(*append_bands_delays)
-        return fetch_keys
+        raise mo.Return(fetch_keys)
 
     async def request_quota_with_spill(self, level: StorageLevel, size: int):
         if await self._quota_refs[level].request_quota(size):
