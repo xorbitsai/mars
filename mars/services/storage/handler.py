@@ -603,23 +603,18 @@ class StorageHandlerActor(mo.Actor):
 
         await asyncio.gather(*transfer_tasks)
 
-        append_bands_delays = []
+        set_meta_keys = set()
         for data_key in fetch_keys:
             # skip shuffle keys
             if isinstance(data_key, tuple):
-                append_bands_delays.append(
-                    meta_api.add_chunk_bands.delay(
-                        data_key[0],
-                        [(self.address, self._band_name)],
-                    )
-                )
+                set_meta_keys.add(data_key[0])
             else:
-                append_bands_delays.append(
-                    meta_api.add_chunk_bands.delay(
-                        data_key,
-                        [(self.address, self._band_name)],
-                    )
-                )
+                set_meta_keys.add(data_key)
+        append_bands_delays = [
+            meta_api.add_chunk_bands.delay(key, [(self.address, self._band_name)])
+            for key in set_meta_keys
+        ]
+
         if append_bands_delays:
             await meta_api.add_chunk_bands.batch(*append_bands_delays)
 
