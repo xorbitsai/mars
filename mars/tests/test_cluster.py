@@ -93,13 +93,27 @@ async def test_cluster():
                 p.kill()
                 raise RuntimeError("Start cluster failed, stderr: \n" + std_err)
 
+    def _check(timeout: float = 1.0):
+        for p in [r, w]:
+            try:
+                retcode = p.wait(timeout)
+            except subprocess.TimeoutExpired:
+                # supervisor & worker will run forever,
+                # timeout means everything goes well, at least looks well,
+                continue
+            else:
+                if retcode:
+                    std_err = r.communicate()[1].decode()
+                    p.kill()
+                    raise RuntimeError("Start cluster failed, stderr: \n" + std_err)
+
     try:
         cluster_api = WebClusterAPI(web_addr)
         while True:
             try:
                 jsn = await cluster_api.get_nodes_info(role=NodeRole.WORKER)
             except ConnectionError:
-                await asyncio.sleep(0.5)
+                await asyncio.to_thread(_check, timeout=0.5)
                 continue
             if not jsn:
                 await asyncio.sleep(0.5)

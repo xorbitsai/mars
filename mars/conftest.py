@@ -15,6 +15,7 @@
 import concurrent.futures
 import os
 import subprocess
+import time
 
 import psutil
 import pytest
@@ -205,14 +206,25 @@ def _new_test_session(check_router_cleaned):
 def _new_integrated_test_session(check_router_cleaned):
     from .deploy.oscar.tests.session import new_test_session
 
-    sess = new_test_session(
-        address="127.0.0.1",
-        backend=MARS_CI_BACKEND,
-        init_local=True,
-        n_worker=2,
-        default=True,
-        timeout=300,
-    )
+    sess = None
+    for i in range(3):
+        try:
+            sess = new_test_session(
+                address="127.0.0.1",
+                backend=MARS_CI_BACKEND,
+                init_local=True,
+                n_worker=2,
+                default=True,
+                timeout=300,
+            )
+        except ChildProcessError:
+            time.sleep(1)
+            if i == 2:
+                raise
+            else:
+                continue
+        else:
+            break
     with option_context({"show_progress": False}):
         try:
             yield sess
