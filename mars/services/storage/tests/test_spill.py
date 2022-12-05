@@ -20,6 +20,9 @@ import tempfile
 import numpy as np
 import pytest
 
+from ...cluster import MockClusterAPI
+from ...cluster.supervisor.node_info import NodeInfoCollectorActor
+from ...cluster.uploader import NodeInfoUploaderActor
 from .... import oscar as mo
 from ....storage import StorageLevel, PlasmaStorage
 from ....utils import calc_data_size
@@ -75,6 +78,7 @@ def _build_storage_config():
 
 @pytest.fixture
 async def create_actors(actor_pool):
+    _ = await MockClusterAPI.create(address=actor_pool.external_address)
     storage_configs = _build_storage_config()
     manager_ref = await mo.create_actor(
         StorageManagerActor,
@@ -134,6 +138,31 @@ async def test_spill(create_actors):
 
     plasma_list = await plasma_handler.list()
     assert len(plasma_list) == len(memory_object_list)
+
+
+@pytest.mark.asyncio
+async def test_disk_info(create_actors):
+    worker_address, _, _ = create_actors
+    uploader_ref = await mo.actor_ref(
+        address=worker_address, uid=NodeInfoUploaderActor.default_uid()
+    )
+    await uploader_ref.upload_node_info()
+    collector_ref = await mo.actor_ref(
+        address=worker_address, uid=NodeInfoCollectorActor.default_uid()
+    )
+    storage_manager = await mo.actor_ref(
+        uid=StorageManagerActor.default_uid(), address=worker_address
+    )
+    init_params = (await storage_manager.get_client_params())["numa-0"]
+    assert "filesystem" in init_params
+    assert "level" in init_params["filesystem"]
+    assert init_params["filesystem"]["level"] == StorageLevel.DISK
+
+    node_info = await collector_ref.get_nodes_info(detail=True)
+    disk_partitions = node_info[worker_address]["detail"]["disk"]["partitions"]
+    assert disk_partitions
+    for _, info in disk_partitions.items():
+        assert "inode_used" in info
 
 
 class DelayPutStorageHandler(StorageHandlerActor):
