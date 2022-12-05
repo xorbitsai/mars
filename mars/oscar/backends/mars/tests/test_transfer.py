@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import shutil
 import sys
 import tempfile
 from typing import List
@@ -202,27 +203,31 @@ async def test_copy_via_fileobjects():
         subprocess_start_method=start_method,
     )
 
-    with tempfile.TemporaryDirectory() as d:
-        async with pool:
-            ctx = get_context()
+    d = tempfile.mkdtemp()
+    async with pool:
+        ctx = get_context()
 
-            # actor on main pool
-            actor_ref1 = await ctx.create_actor(
-                FileobjTransferActor,
-                uid="test-1",
-                address=pool.external_address,
-                allocate_strategy=ProcessIndex(1),
-            )
-            actor_ref2 = await ctx.create_actor(
-                FileobjTransferActor,
-                uid="test-2",
-                address=pool.external_address,
-                allocate_strategy=ProcessIndex(2),
-            )
-            sizes = [10 * 1024**2, 3 * 1024**2]
-            names = []
-            for _ in range(2 * len(sizes)):
-                _, p = tempfile.mkstemp(dir=d)
-                names.append(p)
+        # actor on main pool
+        actor_ref1 = await ctx.create_actor(
+            FileobjTransferActor,
+            uid="test-1",
+            address=pool.external_address,
+            allocate_strategy=ProcessIndex(1),
+        )
+        actor_ref2 = await ctx.create_actor(
+            FileobjTransferActor,
+            uid="test-2",
+            address=pool.external_address,
+            allocate_strategy=ProcessIndex(2),
+        )
+        sizes = [10 * 1024**2, 3 * 1024**2]
+        names = []
+        for _ in range(2 * len(sizes)):
+            _, p = tempfile.mkstemp(dir=d)
+            names.append(p)
 
-            await actor_ref1.copy_data(actor_ref2, names[::2], names[1::2], sizes=sizes)
+        await actor_ref1.copy_data(actor_ref2, names[::2], names[1::2], sizes=sizes)
+    try:
+        shutil.rmtree(d)
+    except PermissionError:
+        pass
