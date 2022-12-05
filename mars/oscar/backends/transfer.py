@@ -160,7 +160,8 @@ class TransferClient:
         async with self._lock:
             await client.send(message)
             for fileobj in local_file_objects:
-                while True:
+                finished = False
+                while not finished:
                     buf = await fileobj.read(DEFAULT_TRANSFER_BLOCK_SIZE)
                     size = _get_buffer_size(buf)
                     if size > 0:
@@ -170,7 +171,10 @@ class TransferClient:
                         self._handle_ack(message)
                     else:
                         await client.send(None)
-                        break
+                        # ack
+                        message = await client.recv()
+                        self._handle_ack(message)
+                        finished = True
 
 
 @contextlib.asynccontextmanager
@@ -259,9 +263,16 @@ class TransferServer:
         channel: Channel,
     ):
         for fileobj in file_objects:
-            while True:
+            finished = False
+            while not finished:
                 recv_buffer = await channel.recv()
-                if recv_buffer is None:
-                    break
-                async with _catch_error(channel, message.message_id):
-                    await fileobj.write(recv_buffer)
+                if recv_buffer is not None:
+                    # not finished, receive part data
+                    async with _catch_error(channel, message.message_id):
+                        await fileobj.write(recv_buffer)
+                else:
+                    # done, send ack
+                    await channel.send(
+                        ResultMessage(message_id=message.message_id, result=True)
+                    )
+                    finished = True
