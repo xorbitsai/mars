@@ -73,7 +73,7 @@ class WrappedStorageFileObject(AioFileObject):
     def __getattr__(self, item):
         return getattr(self._file, item)
 
-    def commit_once(self, sub_key, offset, size):
+    def commit_once(self, sub_key: Tuple, offset: int, size: int):
         self._sub_key_infos[sub_key] = (offset, size)
 
     async def clean_up(self):

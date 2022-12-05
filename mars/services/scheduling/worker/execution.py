@@ -393,10 +393,8 @@ class SubtaskExecutionActor(mo.StatelessActor):
                 subtask, band_name, subtask_api, batch_quota_req
             )
             if remote_mapper_keys:
-                asyncio.create_task(
-                    self.remove_mapper_data(
-                        subtask.session_id, band_name, remote_mapper_keys
-                    )
+                yield self.remove_mapper_data(
+                    subtask.session_id, band_name, remote_mapper_keys
                 )
         except:  # noqa: E722  # pylint: disable=bare-except
             _fill_subtask_result_with_exception(subtask, subtask_info)
@@ -410,7 +408,7 @@ class SubtaskExecutionActor(mo.StatelessActor):
             finally:
                 # pop the subtask info at the end is to cancel the job.
                 self._subtask_info.pop(subtask.subtask_id, None)
-        return subtask_info.result
+        raise mo.Return(subtask_info.result)
 
     async def _retry_run_subtask(
         self, subtask: Subtask, band_name: str, subtask_api: SubtaskAPI, batch_quota_req
