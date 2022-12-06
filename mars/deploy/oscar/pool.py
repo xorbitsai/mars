@@ -91,7 +91,7 @@ def _parse_file_logging_config(
     return config
 
 
-def _config_logging(**kwargs) -> configparser.RawConfigParser:
+def _config_logging(**kwargs) -> Optional[configparser.RawConfigParser]:
     web: bool = kwargs.get("web", True)
     # web=False usually means it is a test environment.
     if not web:
