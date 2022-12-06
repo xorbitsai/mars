@@ -68,7 +68,7 @@ class WorkerCommandRunner(OscarCommandRunner):
 
         if args.cuda_devices == "auto":
             self.cuda_devices = list(range(cuda_count()))
-        elif args.cuda_devices.strip() == "":  # pragma: no cover
+        elif args.cuda_devices.strip() == "-1":
             # allow using CPU only
             self.cuda_devices = []
         else:  # pragma: no cover

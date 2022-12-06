@@ -91,10 +91,72 @@ async def create_actors(actor_pools):
     await mo.destroy_actor(manager_ref2)
 
 
-@pytest.mark.asyncio
-async def test_simple_transfer(create_actors):
-    worker_address_1, worker_address_2 = create_actors
+@pytest.fixture
+async def ucx_actor_pools():
+    async def start_pool():
+        start_method = (
+            os.environ.get("POOL_START_METHOD", "forkserver")
+            if sys.platform != "win32"
+            else None
+        )
 
+        pool = await mo.create_actor_pool(
+            "127.0.0.1",
+            n_process=2,
+            labels=["main", "numa-0", "io"],
+            subprocess_start_method=start_method,
+            external_address_schemes=["ucx"] * 3,
+        )
+        await pool.start()
+        return pool
+
+    worker_pool_1 = await start_pool()
+    worker_pool_2 = await start_pool()
+    try:
+        yield worker_pool_1, worker_pool_2
+    finally:
+        await worker_pool_1.stop()
+        await worker_pool_2.stop()
+
+
+@pytest.fixture
+async def create_ucx_actors(ucx_actor_pools):
+    worker_pool_1, worker_pool_2 = ucx_actor_pools
+
+    manager_ref1 = await mo.create_actor(
+        StorageManagerActor,
+        {"shared_memory": {}},
+        uid=StorageManagerActor.default_uid(),
+        address=worker_pool_1.external_address,
+    )
+
+    manager_ref2 = await mo.create_actor(
+        StorageManagerActor,
+        {"shared_memory": {}},
+        uid=StorageManagerActor.default_uid(),
+        address=worker_pool_2.external_address,
+    )
+    yield worker_pool_1.external_address, worker_pool_2.external_address
+    await mo.destroy_actor(manager_ref1)
+    await mo.destroy_actor(manager_ref2)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enable_oscar_copyto", [True, False])
+async def test_simple_transfer(create_actors, enable_oscar_copyto):
+    worker_address_1, worker_address_2 = create_actors
+    await _transfer_test(worker_address_1, worker_address_2, enable_oscar_copyto)
+
+
+@pytest.mark.asyncio
+async def test_ucx_transfer(create_ucx_actors):
+    worker_address_1, worker_address_2 = create_ucx_actors
+    await _transfer_test(worker_address_1, worker_address_2, True)
+
+
+async def _transfer_test(
+    worker_address_1: str, worker_address_2: str, enable_oscar_copyto: bool
+):
     session_id = "mock_session"
     data1 = np.random.rand(100, 100)
     data2 = pd.DataFrame(np.random.randint(0, 100, (500, 10)))
@@ -121,6 +183,7 @@ async def test_simple_transfer(create_actors):
         worker_address_2,
         StorageLevel.MEMORY,
         block_size=1000,
+        enable_oscar_copyto=enable_oscar_copyto,
     )
 
     await sender_actor.send_batch_data(
@@ -129,6 +192,7 @@ async def test_simple_transfer(create_actors):
         worker_address_2,
         StorageLevel.MEMORY,
         block_size=1000,
+        enable_oscar_copyto=enable_oscar_copyto,
     )
 
     get_data1 = await storage_handler2.get(session_id, "data_key1")
@@ -142,7 +206,11 @@ async def test_simple_transfer(create_actors):
         address=worker_address_2, uid=SenderManagerActor.gen_uid("numa-0")
     )
     await sender_actor.send_batch_data(
-        session_id, ["data_key3"], worker_address_1, StorageLevel.MEMORY
+        session_id,
+        ["data_key3"],
+        worker_address_1,
+        StorageLevel.MEMORY,
+        enable_oscar_copyto=enable_oscar_copyto,
     )
     get_data3 = await storage_handler1.get(session_id, "data_key3")
     pd.testing.assert_frame_equal(data2, get_data3)
@@ -234,7 +302,11 @@ async def test_cancel_transfer(create_actors, mock_sender, mock_receiver):
 
     send_task = asyncio.create_task(
         sender_actor.send_batch_data(
-            "mock", ["data_key1"], worker_address_2, StorageLevel.MEMORY
+            "mock",
+            ["data_key1"],
+            worker_address_2,
+            StorageLevel.MEMORY,
+            enable_oscar_copyto=False,
         )
     )
 
@@ -252,7 +324,11 @@ async def test_cancel_transfer(create_actors, mock_sender, mock_receiver):
 
     send_task = asyncio.create_task(
         sender_actor.send_batch_data(
-            "mock", ["data_key1"], worker_address_2, StorageLevel.MEMORY
+            "mock",
+            ["data_key1"],
+            worker_address_2,
+            StorageLevel.MEMORY,
+            enable_oscar_copyto=False,
         )
     )
     await send_task
@@ -263,12 +339,20 @@ async def test_cancel_transfer(create_actors, mock_sender, mock_receiver):
     if mock_sender is MockSenderManagerActor:
         send_task1 = asyncio.create_task(
             sender_actor.send_batch_data(
-                "mock", ["data_key2"], worker_address_2, StorageLevel.MEMORY
+                "mock",
+                ["data_key2"],
+                worker_address_2,
+                StorageLevel.MEMORY,
+                enable_oscar_copyto=False,
             )
         )
         send_task2 = asyncio.create_task(
             sender_actor.send_batch_data(
-                "mock", ["data_key2"], worker_address_2, StorageLevel.MEMORY
+                "mock",
+                ["data_key2"],
+                worker_address_2,
+                StorageLevel.MEMORY,
+                enable_oscar_copyto=False,
             )
         )
         await asyncio.sleep(0.5)
@@ -281,7 +365,8 @@ async def test_cancel_transfer(create_actors, mock_sender, mock_receiver):
 
 
 @pytest.mark.asyncio
-async def test_transfer_same_data(create_actors):
+@pytest.mark.parametrize("enable_oscar_copyto", [False, True])
+async def test_transfer_same_data(create_actors, enable_oscar_copyto):
     worker_address_1, worker_address_2 = create_actors
 
     session_id = "mock_session"
@@ -306,6 +391,7 @@ async def test_transfer_same_data(create_actors):
             worker_address_2,
             StorageLevel.MEMORY,
             block_size=1000,
+            enable_oscar_copyto=enable_oscar_copyto,
         )
     )
     task2 = asyncio.create_task(
@@ -315,6 +401,7 @@ async def test_transfer_same_data(create_actors):
             worker_address_2,
             StorageLevel.MEMORY,
             block_size=1000,
+            enable_oscar_copyto=enable_oscar_copyto,
         )
     )
     await asyncio.gather(task1, task2)

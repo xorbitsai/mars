@@ -335,6 +335,8 @@ cdef class ClientActorContext(BaseActorContext):
             address = remote_buffer_refs[0].address
             context = self._get_backend_context(address)
             return context.copyto_via_buffers(local_buffers, remote_buffer_refs)
+        else:
+            raise ValueError('buffer size should be at least 1')
 
     def copyto_via_file_objects(
         self,

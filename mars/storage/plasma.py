@@ -55,6 +55,7 @@ class PlasmaFileObject(BufferWrappedFileObject):
 
     def _write_init(self):
         self._buffer = buf = self._plasma_client.create(self._object_id, self._size)
+        self._mv = memoryview(self._buffer)
         file = self._file = pa.FixedSizeBufferWriter(buf)
         file.set_memcopy_threads(6)
 
@@ -80,6 +81,10 @@ class PlasmaFileObject(BufferWrappedFileObject):
     def _read_close(self):
         pass
 
+    def get_buffer(self):
+        self.init()
+        return self._mv
+
 
 class PlasmaStorageFileObject(StorageFileObject):
     def __init__(self, *args, **kwargs):
@@ -89,6 +94,12 @@ class PlasmaStorageFileObject(StorageFileObject):
     async def close(self):
         self._buffer = self._file.buffer
         await super().close()
+
+    def get_buffer(self):
+        buf = self._file.get_buffer()
+        if buf is None:  # pragma: no cover
+            raise AttributeError(f"{type(self)} does not have attribute get_buffer")
+        return buf
 
 
 @dataslots

@@ -23,15 +23,31 @@ import pytest
 
 from .. import new_session
 from .. import tensor as mt
+from .. import remote as mr
 from ..services.cluster import NodeRole, WebClusterAPI
-from ..tests.core import flaky
+from ..tests.core import flaky, lazy_import
 from ..utils import get_next_port
+
+ucp = lazy_import("ucp")
 
 
 CONFIG_CONTENT = """\
 "@inherits": "@mars/config.yml"
 scheduling:
   mem_hard_limit: null"""
+
+UCX_CONFIG_FILE = f"""
+{CONFIG_CONTENT}
+oscar:
+  numa:
+    external_addr_scheme: ucx
+"""
+
+configs = {
+    "default": CONFIG_CONTENT,
+}
+if ucp is not None:
+    configs["ucx"] = UCX_CONFIG_FILE
 
 
 def _terminate(pid: int):
@@ -49,7 +65,8 @@ def _terminate(pid: int):
 
 @flaky(max_runs=3)
 @pytest.mark.asyncio
-async def test_cluster():
+@pytest.mark.parametrize("name", list(configs))
+async def test_cluster(name):
     port = get_next_port()
     web_port = get_next_port()
     supervisor_addr = f"127.0.0.1:{port}"
@@ -58,7 +75,7 @@ async def test_cluster():
     # gen config file
     fd, path = tempfile.mkstemp()
     with os.fdopen(fd, mode="w") as f:
-        f.write(CONFIG_CONTENT)
+        f.write(configs[name])
 
     r = subprocess.Popen(
         [
@@ -77,7 +94,17 @@ async def test_cluster():
         stderr=subprocess.PIPE,
     )
     w = subprocess.Popen(
-        [sys.executable, "-m", "mars.worker", "-s", supervisor_addr, "-f", path]
+        [
+            sys.executable,
+            "-m",
+            "mars.worker",
+            "-s",
+            supervisor_addr,
+            "--cuda-devices",
+            "-1",
+            "-f",
+            path,
+        ]
     )
 
     for p in [r, w]:
@@ -121,9 +148,21 @@ async def test_cluster():
             if len(jsn) > 0:
                 break
 
+        def f():
+            from mars.oscar.backends.router import Router
+
+            mapping = Router.get_instance()._mapping
+            if name == "ucx":
+                assert all(a.startswith("ucx") for a in mapping)
+            else:
+                assert all(not a.startswith("ucx") for a in mapping)
+
         sess = new_session(web_addr, default=True)
         a = mt.arange(10)
         assert a.sum().to_numpy(show_progress=False) == 45
+
+        # no error should be raised
+        mr.spawn(f).execute()
 
         sess2 = new_session(web_addr, session_id=sess.session_id)
         sess2.close()
@@ -133,4 +172,5 @@ async def test_cluster():
 
     # test stderr
     out = r.communicate()[1].decode()
-    assert f"Supervisor started at {supervisor_addr}, web address: {web_addr}" in out
+    saddr = supervisor_addr if name == "default" else f"{name}://{supervisor_addr}"
+    assert f"Supervisor started at {saddr}, web address: {web_addr}" in out

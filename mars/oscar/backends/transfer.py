@@ -21,6 +21,7 @@ from abc import ABC, abstractmethod
 from typing import List, Union, Any
 
 from ...lib.aio import AioFileObject
+from ...utils import is_cuda_buffer
 from ..core import BufferRef, FileObjectRef
 from .communication import Client, Channel
 from .message import (

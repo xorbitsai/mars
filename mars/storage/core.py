@@ -62,6 +62,10 @@ class BufferWrappedFileObject(ABC):
         self._mv = None
         self._buffer = None
 
+    @property
+    def size(self):
+        return self._size
+
     @abstractmethod
     def _read_init(self):
         """
@@ -85,6 +89,14 @@ class BufferWrappedFileObject(ABC):
     @property
     def mode(self):
         return self._mode
+
+    def init(self):
+        if not self._initialized:
+            if self.mode == "w":
+                self._write_init()
+            else:
+                self._read_init()
+            self._initialized = True
 
     def read(self, size=-1):
         if not self._initialized:

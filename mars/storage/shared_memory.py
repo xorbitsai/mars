@@ -86,6 +86,10 @@ class SharedMemoryFileObject(BufferWrappedFileObject):
     def _read_close(self):
         pass
 
+    def get_buffer(self):
+        self.init()
+        return self.shm.buf
+
 
 class ShmStorageFileObject(StorageFileObject):
     def __init__(self, *args, **kwargs):
@@ -96,6 +100,12 @@ class ShmStorageFileObject(StorageFileObject):
         if _is_windows:
             self._shm = self._file.shm
         await super().close()
+
+    def get_buffer(self):
+        buf = self._file.get_buffer()
+        if buf is None:
+            raise AttributeError(f"{type(self)} does not have attribute get_buffer")
+        return buf
 
 
 @register_storage_backend
