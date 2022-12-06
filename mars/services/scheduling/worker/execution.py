@@ -387,7 +387,6 @@ class SubtaskExecutionActor(mo.StatelessActor):
             finally:
                 # pop the subtask info at the end is to cancel the job.
                 self._subtask_info.pop(subtask.subtask_id, None)
-        # raise mo.Return(subtask_info.result)
         return subtask_info.result
 
     async def _retry_run_subtask(
