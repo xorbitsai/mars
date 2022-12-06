@@ -172,9 +172,7 @@ class UCXInitializer:
         new_environ.update(envs)
         os.environ = new_environ
         try:
-            ucp.init(
-                options=options, env_takes_precedence=True, blocking_progress_mode=False
-            )
+            ucp.init(options=options, env_takes_precedence=True)
         finally:
             os.environ = original_environ
 

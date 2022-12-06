@@ -502,7 +502,7 @@ class AbstractActorPool(ABC):
             # no data to read, check channel
             try:
                 await channel.close()
-            except (ConnectionError, EOFError):
+            except (ConnectionError, EOFError):  # pragma: no cover
                 # close failed, ignore
                 pass
 

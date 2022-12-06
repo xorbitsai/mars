@@ -51,7 +51,7 @@ class TransferClient:
     def _handle_ack(message: Union[ResultMessage, ErrorMessage]):
         if message.message_type == MessageType.result:
             assert message.result
-        else:
+        else:  # pragma: no cover
             assert message.message_type == MessageType.error
             raise message.error.with_traceback(message.traceback)
 
