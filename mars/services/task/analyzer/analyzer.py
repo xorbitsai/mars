@@ -363,7 +363,7 @@ class GraphAnalyzer:
             # copied chunk exists because map chunk must have
             # been processed before shuffle proxy
             copied_map_chunk = self._chunk_to_copied[map_chunk]
-            if not hasattr(copied_map_chunk, "extra_params"):
+            if not hasattr(copied_map_chunk, "extra_params"):  # pragma: no cover
                 copied_map_chunk.extra_params = dict()
             copied_map_chunk.extra_params["analyzer_map_reduce_id"] = map_reduce_id
         reducer_bands = [assign_results[r.outputs[0]] for r in reducer_ops]

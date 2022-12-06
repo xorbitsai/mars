@@ -98,7 +98,7 @@ class StorageHandlerActor(mo.Actor):
             if conditions is not None:
                 try:
                     res = res.iloc[tuple(conditions)]
-                except AttributeError:
+                except AttributeError:  # pragma: no cover
                     res = res[tuple(conditions)]
         elif conditions is None:
             res = yield self._clients[data_info.level].get(data_info.object_id)
@@ -427,7 +427,7 @@ class StorageHandlerActor(mo.Actor):
             data_keys.append(data_key)
             sizes.append(size)
         session_id, level, request_quota = extracted_args
-        if level is None:
+        if level is None:  # pragma: no cover
             level = self.highest_level
         if request_quota:  # pragma: no cover
             await self.request_quota_with_spill(level, sum(sizes))
