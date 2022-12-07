@@ -138,6 +138,10 @@ class RemoteFunction(RemoteOperandMixin, Operand):
             elif out_type == OutputType.series:
                 chunk_params["index"] = (0,)
                 chunk_params["shape"] = (np.nan,)
+            elif out_type == OutputType.df_or_series:
+                chunk_params["index"] = (0, 0)
+                chunk_params["shape"] = (np.nan, np.nan)
+                chunk_params["collapse_axis"] = 1
             else:
                 chunk_params["index"] = ()
                 chunk_params["shape"] = ()
