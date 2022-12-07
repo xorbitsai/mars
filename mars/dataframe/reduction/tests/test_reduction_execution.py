@@ -902,6 +902,12 @@ def test_dataframe_aggregate(setup, check_ref_counts):
     result = df.agg(["sum"])
     pd.testing.assert_frame_equal(result.execute().fetch(), data.agg(["sum"]))
 
+    result = df.agg([sum])
+    pd.testing.assert_frame_equal(result.execute().fetch(), data.agg([sum]))
+
+    result = df.agg([np.sum])
+    pd.testing.assert_frame_equal(result.execute().fetch(), data.agg([np.sum]))
+
     result = df.agg(all_aggs)
     pd.testing.assert_frame_equal(result.execute().fetch(), data.agg(all_aggs))
 
@@ -959,6 +965,16 @@ def test_series_aggregate(setup, check_ref_counts):
     pd.testing.assert_series_equal(result.execute().fetch(), data.agg(all_aggs))
 
     result = series.agg({"col_sum": "sum", "col_count": "count"})
+    pd.testing.assert_series_equal(
+        result.execute().fetch(), data.agg({"col_sum": "sum", "col_count": "count"})
+    )
+
+    result = series.agg({"col_sum": sum, "col_count": "count"})
+    pd.testing.assert_series_equal(
+        result.execute().fetch(), data.agg({"col_sum": "sum", "col_count": "count"})
+    )
+
+    result = series.agg({"col_sum": np.sum, "col_count": "count"})
     pd.testing.assert_series_equal(
         result.execute().fetch(), data.agg({"col_sum": "sum", "col_count": "count"})
     )
