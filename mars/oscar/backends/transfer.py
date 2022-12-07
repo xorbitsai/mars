@@ -202,6 +202,13 @@ class _BufferReceiver(_ParallelReceiver):
         size = _get_buffer_size(buffer_or_fileobj)
         n_recv = self._n_recv[index]
 
+        is_cuda = is_cuda_buffer(full_buf)
+        buffer_format = getattr(full_buf, "format", None) if not is_cuda else None
+        if not is_cuda:
+            buffer_or_fileobj = memoryview(buffer_or_fileobj)
+        if buffer_format:
+            buffer_or_fileobj = buffer_or_fileobj.cast(buffer_format)
+
         def copy():
             full_buf[n_recv : n_recv + size] = buffer_or_fileobj
 
