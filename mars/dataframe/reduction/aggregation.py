@@ -369,6 +369,12 @@ class DataFrameAggregate(DataFrameOperand, DataFrameOperandMixin):
             func_name = None
             if isinstance(f, str):
                 f, func_name = _agg_functions[f], f
+            elif f.__name__ in _agg_functions:
+                func_name = f.__name__
+                f = _agg_functions[func_name]
+            elif f.__name__.strip("_") in _agg_functions:
+                func_name = f.__name__.strip("_")
+                f = _agg_functions[func_name]
             if func_rename is not None:
                 func_name = func_rename
             ndim = 1 if cols is None else 2

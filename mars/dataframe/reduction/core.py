@@ -839,6 +839,8 @@ class ReductionCompiler:
             col_dict[key] = list(cols) if cols is not None else None
 
     def add_function(self, func, ndim, cols=None, func_name=None):
+        from .aggregation import _agg_functions
+
         cols = cols if cols is not None and self._axis == 0 else None
 
         func_name = func_name or getattr(func, "__name__", None)
@@ -848,6 +850,10 @@ class ReductionCompiler:
         if func_name == "<custom>" or func_name is None:
             func_name = f"<custom_{self._custom_counter}>"
             self._custom_counter += 1
+        if func_name in _agg_functions:
+            func = _agg_functions[func_name]
+        if func_name.strip("_") in _agg_functions:
+            func = _agg_functions[func_name.strip("_")]
 
         compile_result = self._compile_function(func, func_name, ndim=ndim)
         self._compiled_funcs.append(compile_result)
