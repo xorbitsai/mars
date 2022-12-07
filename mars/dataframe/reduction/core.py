@@ -850,10 +850,14 @@ class ReductionCompiler:
         if func_name == "<custom>" or func_name is None:
             func_name = f"<custom_{self._custom_counter}>"
             self._custom_counter += 1
-        if func_name in _agg_functions:
-            func = _agg_functions[func_name]
-        if func_name.strip("_") in _agg_functions:
-            func = _agg_functions[func_name.strip("_")]
+        if not isinstance(func, functools.partial) and func.__name__ != "nunique":
+            if not (
+                hasattr(func, "__globals__")
+                and func.__globals__["__name__"].startswith("mars")
+            ):
+                func_name = func.__name__.strip("_")
+                if func_name in _agg_functions:
+                    func = _agg_functions[func_name]
 
         compile_result = self._compile_function(func, func_name, ndim=ndim)
         self._compiled_funcs.append(compile_result)
