@@ -219,11 +219,13 @@ class CopytoBuffersMessage(_MessageBase):
     message_type = MessageType.copyto_buffers
 
     buffer_refs: List[BufferRef]
+    content: object
 
     def __int__(
         self,
         message_id: bytes = None,
         buffer_refs: List[BufferRef] = None,
+        content: object = None,
         protocol: int = DEFAULT_PROTOCOL,
         message_trace: list = None,
     ): ...
@@ -232,11 +234,13 @@ class CopytoFileObjectsMessage(_MessageBase):
     message_type = MessageType.copyto_file_objects
 
     fileobj_refs: List[FileObjectRef]
+    content: object
 
     def __int__(
         self,
         message_id: bytes = None,
         fileobj_refs: List[FileObjectRef] = None,
+        content: object = None,
         protocol: int = DEFAULT_PROTOCOL,
         message_trace: list = None,
     ): ...

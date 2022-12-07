@@ -14,8 +14,11 @@
 
 import asyncio
 import contextlib
+import itertools
 import sys
-from typing import List, Union
+import weakref
+from abc import ABC, abstractmethod
+from typing import List, Union, Any
 
 from ...lib.aio import AioFileObject
 from ..core import BufferRef, FileObjectRef
@@ -43,17 +46,215 @@ def _get_buffer_size(buf) -> int:
         return len(buf)
 
 
+def _handle_ack(message: Union[ResultMessage, ErrorMessage]):
+    if message.message_type == MessageType.result:
+        assert message.result
+    else:  # pragma: no cover
+        assert message.message_type == MessageType.error
+        raise message.error.with_traceback(message.traceback)
+
+
+class _ParallelSender(ABC):
+    _message_id_to_futures: weakref.WeakValueDictionary
+
+    def __init__(
+        self,
+        client: Client,
+        local_objs: list,
+        remote_obj_refs: List[Union[BufferRef, FileObjectRef]],
+    ):
+        self.client = client
+        self.local_objs = local_objs
+        self.remote_obj_refs = remote_obj_refs
+
+        self._message_id_to_futures = weakref.WeakValueDictionary()
+        self._n_send = [0] * len(local_objs)
+
+    @staticmethod
+    @abstractmethod
+    def _new_message(ref: Union[BufferRef, FileObjectRef], buf: Any):
+        pass
+
+    @abstractmethod
+    async def _read(self, index: int, buffer_or_fileobj: Any):
+        pass
+
+    async def _send_one(
+        self,
+        index: int,
+        buffer_or_fileobj: Any,
+        remote_ref: Union[BufferRef, FileObjectRef],
+    ):
+        while True:
+            part_buf = await self._read(index, buffer_or_fileobj)
+            size = _get_buffer_size(part_buf)
+            if size == 0:
+                break
+            fut = asyncio.get_running_loop().create_future()
+            message = self._new_message(remote_ref, part_buf)
+            self._message_id_to_futures[message.message_id] = fut
+            await self.client.send(message)
+            self._n_send[index] += size
+            await fut
+
+    async def _recv_ack_in_background(self):
+        while True:
+            ack_message = await self.client.recv()
+            if ack_message is None:
+                # receive finished
+                break
+            fut: asyncio.Future = self._message_id_to_futures[ack_message.message_id]
+            try:
+                _handle_ack(ack_message)
+            except BaseException as e:  # pragma: no cover  # noqa: E722  # nosec  # pylint: disable=bare-except
+                fut.set_exception(e)
+            else:
+                fut.set_result(ack_message.result)
+
+    async def start(self):
+        recv_task = asyncio.create_task(self._recv_ack_in_background())
+        tasks = []
+        for i, local_obj, remote_obj_ref in zip(
+            itertools.count(0), self.local_objs, self.remote_obj_refs
+        ):
+            tasks.append(self._send_one(i, local_obj, remote_obj_ref))
+        try:
+            await asyncio.gather(*tasks)
+        finally:
+            # all send finished, send a None to receiver
+            await self.client.send(None)
+            await recv_task
+
+
+class _ParallelReceiver(ABC):
+    def __init__(
+        self,
+        channel: Channel,
+        local_objs: list,
+        remote_obj_refs: List[Union[BufferRef, FileObjectRef]],
+    ):
+        self.channel = channel
+        self.local_objs = local_objs
+        self.remote_obj_refs = remote_obj_refs
+
+        self._n_recv = [0] * len(local_objs)
+        self._ref_to_i = {ref: i for i, ref in enumerate(remote_obj_refs)}
+
+    @abstractmethod
+    async def _write(self, index: int, buffer_or_fileobj: Any):
+        pass
+
+    @staticmethod
+    @staticmethod
+    def _get_ref_from_message(
+        message: Union[CopytoBuffersMessage, CopytoFileObjectsMessage]
+    ):
+        pass
+
+    async def _recv_part(self, buf: Any, index: int, message_id: bytes):
+        async with _catch_error(self.channel, message_id):
+            await self._write(index, buf)
+            self._n_recv[index] += _get_buffer_size(buf)
+
+    async def start(self):
+        tasks = []
+        while True:
+            message = await self.channel.recv()
+            if message is None:
+                # send finished
+                break
+            message_id = message.message_id
+            buf = message.content
+            ref = self._get_ref_from_message(message)[0]
+            i = self._ref_to_i[ref]
+            tasks.append(asyncio.create_task(self._recv_part(buf, i, message_id)))
+        try:
+            await asyncio.gather(*tasks)
+        finally:
+            # when all done, send a None to finish client
+            await self.channel.send(None)
+
+
+class _BufferSender(_ParallelSender):
+    def __init__(
+        self, client: Client, local_buffers: list, remote_buffer_refs: List[BufferRef]
+    ):
+        super().__init__(client, local_buffers, remote_buffer_refs)
+
+    @staticmethod
+    def _new_message(ref: Union[BufferRef, FileObjectRef], buf: Any):
+        return CopytoBuffersMessage(
+            message_id=new_message_id(), buffer_refs=[ref], content=buf
+        )
+
+    async def _read(self, index: int, buffer_or_fileobj: Any):
+        size = self._n_send[index]
+        return buffer_or_fileobj[size : size + DEFAULT_TRANSFER_BLOCK_SIZE]
+
+
+class _BufferReceiver(_ParallelReceiver):
+    def __init__(self, channel: Channel, buffers: list, buffer_refs: List[BufferRef]):
+        super().__init__(channel, buffers, buffer_refs)
+
+    async def _write(self, index: int, buffer_or_fileobj: Any):
+        full_buf = self.local_objs[index]
+        size = _get_buffer_size(buffer_or_fileobj)
+        n_recv = self._n_recv[index]
+
+        def copy():
+            full_buf[n_recv : n_recv + size] = buffer_or_fileobj
+
+        await asyncio.to_thread(copy)
+
+    @staticmethod
+    def _get_ref_from_message(
+        message: Union[CopytoBuffersMessage, CopytoFileObjectsMessage]
+    ):
+        return message.buffer_refs
+
+
+class _FileObjectSender(_ParallelSender):
+    def __init__(
+        self,
+        client: Client,
+        local_file_objects: list,
+        remote_file_object_refs: List[FileObjectRef],
+    ):
+        super().__init__(client, local_file_objects, remote_file_object_refs)
+
+    @staticmethod
+    def _new_message(ref: Union[BufferRef, FileObjectRef], buf: Any):
+        return CopytoFileObjectsMessage(
+            message_id=new_message_id(), fileobj_refs=[ref], content=buf
+        )
+
+    async def _read(self, index: int, buffer_or_fileobj: Any):
+        return await buffer_or_fileobj.read(DEFAULT_TRANSFER_BLOCK_SIZE)
+
+
+class _FileObjectReceiver(_ParallelReceiver):
+    def __init__(
+        self,
+        channel: Channel,
+        file_objects: list,
+        file_object_refs: List[FileObjectRef],
+    ):
+        super().__init__(channel, file_objects, file_object_refs)
+
+    async def _write(self, index: int, buffer_or_fileobj: Any):
+        fileobj = self.local_objs[index]
+        await fileobj.write(buffer_or_fileobj)
+
+    @staticmethod
+    def _get_ref_from_message(
+        message: Union[CopytoBuffersMessage, CopytoFileObjectsMessage]
+    ):
+        return message.fileobj_refs
+
+
 class TransferClient:
     def __init__(self):
         self._lock = asyncio.Lock()
-
-    @staticmethod
-    def _handle_ack(message: Union[ResultMessage, ErrorMessage]):
-        if message.message_type == MessageType.result:
-            assert message.result
-        else:  # pragma: no cover
-            assert message.message_type == MessageType.error
-            raise message.error.with_traceback(message.traceback)
 
     async def copyto_via_buffers(
         self, local_buffers: list, remote_buffer_refs: List[BufferRef]
@@ -92,8 +293,10 @@ class TransferClient:
 
             async with self._lock:
                 await client.send(message)
-                self._handle_ack(await client.recv())
-                await self._send_buffers_in_batches(local_buffers, client)
+                _handle_ack(await client.recv())
+                await self._send_buffers_in_batches(
+                    local_buffers, remote_buffer_refs, client
+                )
         else:
             client, is_cached = await router.get_client_via_type(
                 address, client_type, from_who=self, return_from_cache=True
@@ -104,7 +307,7 @@ class TransferClient:
 
             async with self._lock:
                 await client.send(message)
-                self._handle_ack(await client.recv())
+                _handle_ack(await client.recv())
                 await client.send_buffers(local_buffers)
 
     @staticmethod
@@ -115,23 +318,11 @@ class TransferClient:
         )
 
     @classmethod
-    async def _send_buffers_in_batches(cls, local_buffers: list, client: Client):
-        for buffer in local_buffers:
-            i = 0
-            while True:
-                curr_buf = buffer[
-                    i
-                    * DEFAULT_TRANSFER_BLOCK_SIZE : (i + 1)
-                    * DEFAULT_TRANSFER_BLOCK_SIZE
-                ]
-                size = _get_buffer_size(curr_buf)
-                if size == 0:
-                    break
-                await client.send(curr_buf)
-                # ack
-                message = await client.recv()
-                cls._handle_ack(message)
-                i += 1
+    async def _send_buffers_in_batches(
+        cls, local_buffers: list, remote_buffer_refs: List[BufferRef], client: Client
+    ):
+        sender = _BufferSender(client, local_buffers, remote_buffer_refs)
+        await sender.start()
 
     async def copyto_via_file_objects(
         self,
@@ -159,22 +350,11 @@ class TransferClient:
         )
         async with self._lock:
             await client.send(message)
-            for fileobj in local_file_objects:
-                finished = False
-                while not finished:
-                    buf = await fileobj.read(DEFAULT_TRANSFER_BLOCK_SIZE)
-                    size = _get_buffer_size(buf)
-                    if size > 0:
-                        await client.send(buf)
-                        # ack
-                        message = await client.recv()
-                        self._handle_ack(message)
-                    else:
-                        await client.send(None)
-                        # ack
-                        message = await client.recv()
-                        self._handle_ack(message)
-                        finished = True
+            _handle_ack(await client.recv())
+            sender = _FileObjectSender(
+                client, local_file_objects, remote_file_object_refs
+            )
+            await sender.start()
 
 
 @contextlib.asynccontextmanager
@@ -243,17 +423,9 @@ class TransferServer:
     async def _recv_buffers_in_batches(
         cls, message: CopytoBuffersMessage, buffers: list, channel: Channel
     ):
-        for buffer in buffers:
-            size = _get_buffer_size(buffer)
-            acc = 0
-            while True:
-                async with _catch_error(channel, message.message_id):
-                    recv_buffer = await channel.recv()
-                    cur_size = _get_buffer_size(recv_buffer)
-                    buffer[acc : acc + cur_size] = recv_buffer
-                acc += cur_size
-                if acc >= size:
-                    break
+        buffer_refs = message.buffer_refs
+        receiver = _BufferReceiver(channel, buffers, buffer_refs)
+        await receiver.start()
 
     @classmethod
     async def _recv_file_objects(
@@ -262,17 +434,6 @@ class TransferServer:
         file_objects: List[AioFileObject],
         channel: Channel,
     ):
-        for fileobj in file_objects:
-            finished = False
-            while not finished:
-                recv_buffer = await channel.recv()
-                if recv_buffer is not None:
-                    # not finished, receive part data
-                    async with _catch_error(channel, message.message_id):
-                        await fileobj.write(recv_buffer)
-                else:
-                    # done, send ack
-                    await channel.send(
-                        ResultMessage(message_id=message.message_id, result=True)
-                    )
-                    finished = True
+        file_object_refs = message.fileobj_refs
+        receiver = _FileObjectReceiver(channel, file_objects, file_object_refs)
+        await receiver.start()

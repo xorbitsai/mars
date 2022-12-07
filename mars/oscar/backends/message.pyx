@@ -493,11 +493,13 @@ cdef class CopytoBuffersMessage(_MessageBase):
 
     cdef:
         public list buffer_refs
+        public object content
 
     def __init__(
         self,
         bytes message_id = None,
         list buffer_refs = None,
+        object content = None,
         int protocol = _DEFAULT_PROTOCOL,
         list message_trace = None,
     ):
@@ -508,6 +510,7 @@ cdef class CopytoBuffersMessage(_MessageBase):
             message_trace=message_trace
         )
         self.buffer_refs = buffer_refs
+        self.content = content
 
     cdef _MessageSerialItem serial(self):
         cdef _MessageSerialItem item = _MessageBase.serial(self)
@@ -516,6 +519,7 @@ cdef class CopytoBuffersMessage(_MessageBase):
                 buffer_ref.address, buffer_ref.uid
             )
         item.serialized += (len(self.buffer_refs),)
+        item.subs = [self.content]
         return item
 
     cdef deserial_members(self, tuple serialized, list subs):
@@ -526,17 +530,20 @@ cdef class CopytoBuffersMessage(_MessageBase):
             refs.append(BufferRef(address, uid))
         assert len(refs) == size
         self.buffer_refs = refs
+        self.content = subs[0]
 
 cdef class CopytoFileObjectsMessage(_MessageBase):
     message_type = MessageType.copyto_fileobjects
 
     cdef:
         public list fileobj_refs
+        public object content
 
     def __init__(
         self,
         bytes message_id = None,
         list fileobj_refs = None,
+        object content = None,
         int protocol = _DEFAULT_PROTOCOL,
         list message_trace = None,
     ):
@@ -547,6 +554,7 @@ cdef class CopytoFileObjectsMessage(_MessageBase):
             message_trace=message_trace
         )
         self.fileobj_refs = fileobj_refs
+        self.content = content
 
     cdef _MessageSerialItem serial(self):
         cdef _MessageSerialItem item = _MessageBase.serial(self)
@@ -555,6 +563,7 @@ cdef class CopytoFileObjectsMessage(_MessageBase):
                 fileobj_ref.address, fileobj_ref.uid
             )
         item.serialized += (len(self.fileobj_refs),)
+        item.subs = [self.content]
         return item
 
     cdef deserial_members(self, tuple serialized, list subs):
@@ -565,6 +574,7 @@ cdef class CopytoFileObjectsMessage(_MessageBase):
             refs.append(FileObjectRef(address, uid))
         assert len(refs) == size
         self.fileobj_refs = refs
+        self.content = subs[0]
 
 
 cdef dict _message_type_to_message_cls = {
