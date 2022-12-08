@@ -229,6 +229,7 @@ async def test_ucx_channel():
     size = 2**5
 
     async def handle_channel(channel: UCXChannel):
+        assert await channel.recv() == 1
         buffer = np.empty(size, dtype="u1")
         await channel.recv_buffers([buffer])
         await channel.send_buffers([buffer])
@@ -243,7 +244,7 @@ async def test_ucx_channel():
     client = await UCXServer.client_type.connect(addr)
     buf = np.zeros(size, dtype="u1")
     buf += 1
-    await client.send_buffers([buf])
+    await client.send_objects_and_buffers([1], [buf])
     new_buf = np.empty_like(buf)
     await client.recv_buffers([new_buf])
     np.testing.assert_array_equal(buf, new_buf)

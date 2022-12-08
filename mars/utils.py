@@ -1914,3 +1914,10 @@ def convert_to_cupy_ndarray(
     memory = _cupy.cuda.UnownedMemory(data, size, cuda_buffer)
     ptr = _cupy.cuda.MemoryPointer(memory, 0)
     return _cupy.ndarray(shape=size, dtype="u1", memptr=ptr)
+
+
+def get_buffer_size(buf: Any) -> int:
+    try:
+        return buf.nbytes
+    except AttributeError:  # pragma: no cover
+        return len(buf)
