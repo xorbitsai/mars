@@ -30,7 +30,6 @@ class Router:
         "_mapping",
         "_comm_config",
         "_cache_local",
-        "_lock",
     )
 
     _instance: "Router" = None
@@ -64,7 +63,6 @@ class Router:
         self._mapping = mapping
         self._comm_config = comm_config or dict()
         self._cache_local = threading.local()
-        self._lock = asyncio.Lock()
 
     @property
     def _cache(self) -> Dict[Tuple[str, Any, Optional[Type[Client]]], Client]:
@@ -73,6 +71,14 @@ class Router:
         except AttributeError:
             cache = self._cache_local.cache = dict()
             return cache
+
+    @property
+    def _lock(self) -> asyncio.Lock:
+        try:
+            return self._cache_local.lock
+        except AttributeError:
+            lock = self._cache_local.lock = asyncio.Lock()
+            return lock
 
     def set_mapping(self, mapping: Dict[str, str]):
         self._mapping = mapping
