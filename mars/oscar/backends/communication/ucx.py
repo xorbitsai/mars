@@ -308,7 +308,7 @@ class UCXChannel(Channel):
             try:
                 for buffer in buffers:
                     await self.ucp_endpoint.recv(buffer)
-            except BaseException as e:
+            except BaseException as e:  # pragma: no cover
                 if not self._closed:
                     # In addition to UCX exceptions, may be CancelledError or another
                     # "low-level" exception. The only safe thing to do is to abort.
@@ -455,6 +455,7 @@ class UCXServer(Server):
         await asyncio.gather(
             *(channel.close() for channel in self._channels if not channel.closed)
         )
+        self._channels = []
         self._ucp_listener = None
         self._closed.set()
 

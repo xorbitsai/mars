@@ -191,7 +191,7 @@ class Router:
                     return cached_client
 
         client_type_to_addresses = self._get_client_type_to_addresses(external_address)
-        if client_type not in client_type_to_addresses:
+        if client_type not in client_type_to_addresses:  # pragma: no cover
             raise ValueError(
                 f"Client type({client_type}) is not supported for {external_address}"
             )

@@ -159,6 +159,7 @@ class _BaseSocketServer(Server, metaclass=ABCMeta):
         await asyncio.gather(
             *(channel.close() for channel in self._channels if not channel.closed)
         )
+        self._channels = []
 
     @property
     @implements(Server.stopped)

@@ -73,11 +73,11 @@ class _ParallelSender(ABC):
     @staticmethod
     @abstractmethod
     def _new_message(ref: Union[BufferRef, FileObjectRef], buf: Any):
-        pass
+        """new message"""
 
     @abstractmethod
     async def _read(self, index: int, buffer_or_fileobj: Any):
-        pass
+        """read data"""
 
     async def _send_one(
         self,
@@ -142,14 +142,14 @@ class _ParallelReceiver(ABC):
 
     @abstractmethod
     async def _write(self, index: int, buffer_or_fileobj: Any):
-        pass
+        """write data"""
 
     @staticmethod
     @staticmethod
     def _get_ref_from_message(
         message: Union[CopytoBuffersMessage, CopytoFileObjectsMessage]
     ):
-        pass
+        """get ref according to message"""
 
     async def _recv_part(self, buf: Any, index: int, message_id: bytes):
         async with _catch_error(self.channel, message_id):
@@ -285,7 +285,7 @@ class TransferClient:
             # do not support buffer copy
             # send data in batches
             client, is_cached = await router.get_client(
-                address, from_who=self, return_from_cache=True
+                address, from_who=type(self), return_from_cache=True
             )
             if not is_cached:
                 # tell server to switch to transfer dedicated channel
@@ -299,7 +299,7 @@ class TransferClient:
                 )
         else:
             client, is_cached = await router.get_client_via_type(
-                address, client_type, from_who=self, return_from_cache=True
+                address, client_type, from_who=type(self), return_from_cache=True
             )
             if not is_cached:
                 # tell server to switch to transfer dedicated channel
@@ -339,7 +339,7 @@ class TransferClient:
         ), "`copyto_via_file_objects` can only be used inside pools"
         address = remote_file_object_refs[0].address
         client, is_cached = await router.get_client(
-            address, from_who=self, return_from_cache=True
+            address, from_who=type(self), return_from_cache=True
         )
         if not is_cached:
             # tell server to switch to transfer dedicated channel
