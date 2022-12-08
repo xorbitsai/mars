@@ -850,12 +850,16 @@ class ReductionCompiler:
         if func_name == "<custom>" or func_name is None:
             func_name = f"<custom_{self._custom_counter}>"
             self._custom_counter += 1
-        if not isinstance(func, functools.partial) and func.__name__ != "nunique":
+        if (
+            not isinstance(func, functools.partial)
+            and getattr(func, "__name__", None) != "nunique"
+        ):
             if not (
                 hasattr(func, "__globals__")
+                and "__package__" in func.__globals__
                 and func.__globals__["__package__"].startswith("mars")
             ):
-                func_name = func.__name__.strip("_")
+                func_name = func_name.strip("_")
                 if func_name in ["amax", "amin"]:
                     func_name = func_name.strip("a")
 
