@@ -23,7 +23,7 @@ from ... import get_context
 from ... import oscar as mo
 from ... import tensor as mt
 from ...core import tile
-from ...dataframe.core import DATAFRAME_TYPE, SERIES_TYPE
+from ...dataframe.core import DATAFRAME_TYPE, SERIES_TYPE, DATAFRAME_OR_SERIES_TYPE
 from ...deploy.oscar.session import get_default_session
 from ...learn.utils import shuffle
 from ...lib.mmh3 import hash as mmh3_hash
@@ -83,7 +83,7 @@ def test_remote_function(setup):
     assert spawn(f).execute().fetch() == 6
 
 
-def test_specify_output_types(setup):
+def test_specific_output_types(setup):
     pd_df = pd.DataFrame(np.ones((10, 3)), columns=["a", "b", "c"])
 
     def f1():
@@ -107,6 +107,34 @@ def test_specify_output_types(setup):
     assert r.index_value is not None
     assert r.name == pd_series.name
     pd.testing.assert_series_equal(r.fetch(), pd_series)
+
+    def f3(v):
+        if v > 0:
+            return pd_series
+        else:
+            return pd_df
+
+    r = spawn(f3, args=(1,), output_types="df_or_series").execute()
+
+    assert isinstance(r, DATAFRAME_OR_SERIES_TYPE)
+    assert r.index_value is not None
+    assert r.name == pd_series.name
+    assert r.shape == pd_series.shape
+    assert getattr(r, "dtypes", None) is None
+    s = r.ensure_data()
+    assert isinstance(s, SERIES_TYPE)
+    pd.testing.assert_series_equal(s.fetch(), pd_series)
+
+    r = spawn(f3, args=(0,), output_types="df_or_series").execute()
+
+    assert isinstance(r, DATAFRAME_OR_SERIES_TYPE)
+    assert r.index_value is not None
+    pd.testing.assert_series_equal(r.dtypes, pd_df.dtypes)
+    assert r.shape == pd_df.shape
+    assert getattr(r, "dtype", None) is None
+    s = r.ensure_data()
+    assert isinstance(s, DATAFRAME_TYPE)
+    pd.testing.assert_frame_equal(s.fetch(), pd_df)
 
     np_array = np.random.rand(10, 10)
 
