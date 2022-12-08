@@ -79,6 +79,7 @@ class SharedMemoryFileObject(BufferWrappedFileObject):
         self._buffer = self._mv = shm.buf
         if self._size is None:
             (self._size,) = _qword_pack.unpack(shm.buf[-8:])
+        self._buffer = self._buffer[: self._size + 8]
 
     def _write_close(self):
         pass
@@ -88,7 +89,7 @@ class SharedMemoryFileObject(BufferWrappedFileObject):
 
     def get_buffer(self):
         self.init()
-        return self.shm.buf
+        return self._buffer
 
 
 class ShmStorageFileObject(StorageFileObject):
