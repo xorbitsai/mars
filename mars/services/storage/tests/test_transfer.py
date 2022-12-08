@@ -59,10 +59,8 @@ async def actor_pools():
         await worker_pool_2.stop()
 
 
-@pytest.fixture
-async def create_actors(actor_pools):
-    worker_pool_1, worker_pool_2 = actor_pools
-
+storage_options = [{"shared_memory": {}}]
+if not _is_windows:
     if sys.platform == "darwin":
         plasma_dir = "/tmp"
     else:
@@ -70,9 +68,13 @@ async def create_actors(actor_pools):
     plasma_setup_params = dict(
         store_memory=5 * 1024 * 1024, plasma_directory=plasma_dir, check_dir_size=False
     )
-    storage_configs = (
-        {"plasma": plasma_setup_params} if not _is_windows else {"shared_memory": {}}
-    )
+    storage_options.append({"plasma": plasma_setup_params})
+
+
+@pytest.fixture(params=storage_options)
+async def create_actors(actor_pools, request):
+    worker_pool_1, worker_pool_2 = actor_pools
+    storage_configs = request.param
 
     manager_ref1 = await mo.create_actor(
         StorageManagerActor,
