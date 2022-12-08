@@ -375,8 +375,8 @@ class DataFrameAggregate(DataFrameOperand, DataFrameOperandMixin):
             ):
                 if not (
                     hasattr(f, "__globals__")
-                    and "__package__" in f.__globals__
-                    and f.__globals__["__package__"].startswith("mars")
+                    and "__name__" in f.__globals__
+                    and f.__globals__["__name__"].startswith("mars")
                 ):
                     func_name = f.__name__.strip("_")
                     if func_name in ["amax", "amin"]:

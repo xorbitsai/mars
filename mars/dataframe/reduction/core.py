@@ -856,8 +856,8 @@ class ReductionCompiler:
         ):
             if not (
                 hasattr(func, "__globals__")
-                and "__package__" in func.__globals__
-                and func.__globals__["__package__"].startswith("mars")
+                and "__name__" in func.__globals__
+                and func.__globals__["__name__"].startswith("mars")
             ):
                 func_name = func_name.strip("_")
                 if func_name in ["amax", "amin"]:
