@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import threading
 from typing import Dict, List, Tuple, Type, Any, Optional, Union
 
@@ -29,6 +30,7 @@ class Router:
         "_mapping",
         "_comm_config",
         "_cache_local",
+        "_lock",
     )
 
     _instance: "Router" = None
@@ -62,6 +64,7 @@ class Router:
         self._mapping = mapping
         self._comm_config = comm_config or dict()
         self._cache_local = threading.local()
+        self._lock = asyncio.Lock()
 
     @property
     def _cache(self) -> Dict[Tuple[str, Any, Optional[Type[Client]]], Client]:
@@ -115,29 +118,30 @@ class Router:
         return_from_cache=False,
         **kw,
     ) -> Union[Client, Tuple[Client, bool]]:
-        if cached and (external_address, from_who, None) in self._cache:
-            cached_client = self._cache[external_address, from_who, None]
-            if cached_client.closed:
-                # closed before, ignore it
-                del self._cache[external_address, from_who, None]
-            else:
-                if return_from_cache:
-                    return cached_client, True
+        async with self._lock:
+            if cached and (external_address, from_who, None) in self._cache:
+                cached_client = self._cache[external_address, from_who, None]
+                if cached_client.closed:
+                    # closed before, ignore it
+                    del self._cache[external_address, from_who, None]
                 else:
-                    return cached_client
+                    if return_from_cache:
+                        return cached_client, True
+                    else:
+                        return cached_client
 
-        address = self.get_internal_address(external_address)
-        if address is None:
-            # no inner address, just use external address
-            address = external_address
-        client_type: Type[Client] = get_client_type(address)
-        client = await self._create_client(client_type, address, **kw)
-        if cached:
-            self._cache[external_address, from_who, None] = client
-        if return_from_cache:
-            return client, False
-        else:
-            return client
+            address = self.get_internal_address(external_address)
+            if address is None:
+                # no inner address, just use external address
+                address = external_address
+            client_type: Type[Client] = get_client_type(address)
+            client = await self._create_client(client_type, address, **kw)
+            if cached:
+                self._cache[external_address, from_who, None] = client
+            if return_from_cache:
+                return client, False
+            else:
+                return client
 
     async def _create_client(
         self, client_type: Type[Client], address: str, **kw
@@ -179,27 +183,30 @@ class Router:
         return_from_cache=False,
         **kw,
     ) -> Union[Client, Tuple[Client, bool]]:
-        if cached and (external_address, from_who, client_type) in self._cache:
-            cached_client = self._cache[external_address, from_who, client_type]
-            if cached_client.closed:
-                # closed before, ignore it
-                del self._cache[external_address, from_who, client_type]
-            else:
-                if return_from_cache:
-                    return cached_client, True
+        async with self._lock:
+            if cached and (external_address, from_who, client_type) in self._cache:
+                cached_client = self._cache[external_address, from_who, client_type]
+                if cached_client.closed:
+                    # closed before, ignore it
+                    del self._cache[external_address, from_who, client_type]
                 else:
-                    return cached_client
+                    if return_from_cache:
+                        return cached_client, True
+                    else:
+                        return cached_client
 
-        client_type_to_addresses = self._get_client_type_to_addresses(external_address)
-        if client_type not in client_type_to_addresses:  # pragma: no cover
-            raise ValueError(
-                f"Client type({client_type}) is not supported for {external_address}"
+            client_type_to_addresses = self._get_client_type_to_addresses(
+                external_address
             )
-        address = client_type_to_addresses[client_type]
-        client = await self._create_client(client_type, address, **kw)
-        if cached:
-            self._cache[external_address, from_who, client_type] = client
-        if return_from_cache:
-            return client, False
-        else:
-            return client
+            if client_type not in client_type_to_addresses:  # pragma: no cover
+                raise ValueError(
+                    f"Client type({client_type}) is not supported for {external_address}"
+                )
+            address = client_type_to_addresses[client_type]
+            client = await self._create_client(client_type, address, **kw)
+            if cached:
+                self._cache[external_address, from_who, client_type] = client
+            if return_from_cache:
+                return client, False
+            else:
+                return client

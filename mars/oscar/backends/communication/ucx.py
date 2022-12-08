@@ -403,7 +403,7 @@ class UCXServer(Server):
                     client_ucp_endpoint, local_address=server.address
                 )
             except ChannelClosed:  # pragma: no cover
-                logger.debug("Connection closed before handshake completed")
+                logger.exception("Connection closed before handshake completed")
                 return
 
         ucp_listener = ucp.create_listener(serve_forever, port=port)
@@ -492,8 +492,11 @@ class UCXClient(Client):
 
         try:
             ucp_endpoint = await ucp.create_endpoint(host, port)
-        except ucp.exceptions.UCXBaseException:  # pragma: no cover
-            raise ChannelClosed("Connection closed before handshake completed")
+        except ucp.exceptions.UCXBaseException as e:  # pragma: no cover
+            raise ChannelClosed(
+                f"Connection closed before handshake completed, "
+                f"local address: {local_address}, dest address: {dest_address}"
+            ) from e
         channel = UCXChannel(
             ucp_endpoint, local_address=local_address, dest_address=dest_address
         )
