@@ -369,21 +369,6 @@ class DataFrameAggregate(DataFrameOperand, DataFrameOperandMixin):
             func_name = None
             if isinstance(f, str):
                 f, func_name = _agg_functions[f], f
-            elif (
-                not isinstance(f, functools.partial)
-                and getattr(f, "__name__", None) != "nunique"
-            ):
-                if not (
-                    hasattr(f, "__globals__")
-                    and "__name__" in f.__globals__
-                    and f.__globals__["__name__"].startswith("mars")
-                ):
-                    func_name = f.__name__.strip("_")
-                    if func_name in ["amax", "amin"]:
-                        func_name = func_name.strip("a")
-
-                    if func_name in _agg_functions:
-                        f = _agg_functions[func_name]
             if func_rename is not None:
                 func_name = func_rename
             ndim = 1 if cols is None else 2
