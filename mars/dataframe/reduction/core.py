@@ -853,9 +853,12 @@ class ReductionCompiler:
         if not isinstance(func, functools.partial) and func.__name__ != "nunique":
             if not (
                 hasattr(func, "__globals__")
-                and func.__globals__["__name__"].startswith("mars")
+                and func.__globals__["__package__"].startswith("mars")
             ):
                 func_name = func.__name__.strip("_")
+                if func_name in ["amax", "amin"]:
+                    func_name = func_name.strip("a")
+
                 if func_name in _agg_functions:
                     func = _agg_functions[func_name]
 

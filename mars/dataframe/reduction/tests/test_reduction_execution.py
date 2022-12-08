@@ -920,6 +920,12 @@ def test_dataframe_aggregate(setup, check_ref_counts):
         data.agg({0: ["sum", "min", "var"], 9: ["mean", "var", "std"]}),
     )
 
+    result = df.agg(x=(0, max), y=(1, "min"), z=(2, np.mean))
+    pd.testing.assert_frame_equal(
+        result.execute().fetch(),
+        data.agg(x=(0, max), y=(1, "min"), z=(2, np.mean)),
+    )
+
     if _support_kw_agg:
         agg_kw = dict(
             sum_0=NamedAgg(0, "sum"),
@@ -971,12 +977,12 @@ def test_series_aggregate(setup, check_ref_counts):
 
     result = series.agg({"col_sum": sum, "col_count": "count"})
     pd.testing.assert_series_equal(
-        result.execute().fetch(), data.agg({"col_sum": "sum", "col_count": "count"})
+        result.execute().fetch(), data.agg({"col_sum": sum, "col_count": "count"})
     )
 
     result = series.agg({"col_sum": np.sum, "col_count": "count"})
     pd.testing.assert_series_equal(
-        result.execute().fetch(), data.agg({"col_sum": "sum", "col_count": "count"})
+        result.execute().fetch(), data.agg({"col_sum": np.sum, "col_count": "count"})
     )
 
     if _support_kw_agg:

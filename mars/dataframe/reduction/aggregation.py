@@ -372,9 +372,12 @@ class DataFrameAggregate(DataFrameOperand, DataFrameOperandMixin):
             elif not isinstance(f, functools.partial) and f.__name__ != "nunique":
                 if not (
                     hasattr(f, "__globals__")
-                    and f.__globals__["__name__"].startswith("mars")
+                    and f.__globals__["__package__"].startswith("mars")
                 ):
                     func_name = f.__name__.strip("_")
+                    if func_name in ["amax", "amin"]:
+                        func_name = func_name.strip("a")
+
                     if func_name in _agg_functions:
                         f = _agg_functions[func_name]
             if func_rename is not None:
