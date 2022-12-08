@@ -23,6 +23,7 @@ import pytest
 from .... import oscar as mo
 from ....oscar.backends.allocate_strategy import IdleLabel
 from ....storage import StorageLevel
+from ....tests.core import require_ucx
 from ..core import DataManagerActor, StorageManagerActor, StorageQuotaActor
 from ..errors import DataNotExist
 from ..handler import StorageHandlerActor
@@ -148,6 +149,7 @@ async def test_simple_transfer(create_actors, enable_oscar_copyto):
     await _transfer_test(worker_address_1, worker_address_2, enable_oscar_copyto)
 
 
+@require_ucx
 @pytest.mark.asyncio
 async def test_ucx_transfer(create_ucx_actors):
     worker_address_1, worker_address_2 = create_ucx_actors

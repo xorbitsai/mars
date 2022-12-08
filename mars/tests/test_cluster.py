@@ -149,7 +149,7 @@ async def test_cluster(name):
                 break
 
         def f():
-            from mars.oscar.backends.router import Router
+            from ..oscar.backends.router import Router
 
             mapping = Router.get_instance()._mapping
             if name == "ucx":
