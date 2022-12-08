@@ -40,6 +40,21 @@ from .router import Router
 DEFAULT_TRANSFER_BLOCK_SIZE = 4 * 1024**2
 
 
+@contextlib.contextmanager
+def temp_transfer_block_size(size: int):
+    global DEFAULT_TRANSFER_BLOCK_SIZE
+
+    if size == DEFAULT_TRANSFER_BLOCK_SIZE:
+        yield
+    else:
+        default_size = DEFAULT_TRANSFER_BLOCK_SIZE
+        DEFAULT_TRANSFER_BLOCK_SIZE = size
+        try:
+            yield
+        finally:
+            DEFAULT_TRANSFER_BLOCK_SIZE = default_size
+
+
 def _get_buffer_size(buf) -> int:
     try:
         return buf.nbytes

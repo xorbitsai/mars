@@ -207,10 +207,11 @@ class SenderManagerActor(mo.StatelessActor):
                         rest_keys.append(data_key)
 
                 if local_buffers:
-                    # for data that supports buffer protocol on both sides
-                    # hand over to oscar to transfer data
-                    await mo.copyto_via_buffers(local_buffers, remote_buffer_refs)
-                    await receiver_ref.close_writers(session_id, copied_keys)
+                    with mo.temp_transfer_block_size(block_size):
+                        # for data that supports buffer protocol on both sides
+                        # hand over to oscar to transfer data
+                        await mo.copyto_via_buffers(local_buffers, remote_buffer_refs)
+                        await receiver_ref.close_writers(session_id, copied_keys)
             else:
                 rest_keys = to_send_keys
                 rest_readers = readers
