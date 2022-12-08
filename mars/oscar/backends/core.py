@@ -39,7 +39,7 @@ class ActorCaller:
         self._clients: Dict[Client, asyncio.Task] = dict()
 
     async def get_client(self, router: Router, dest_address: str) -> Client:
-        client = await router.get_client(dest_address, from_who=type(self))
+        client = await router.get_client(dest_address, from_who=self)
         if client not in self._clients:
             self._clients[client] = asyncio.create_task(self._listen(client))
             self._client_to_message_futures[client] = dict()

@@ -285,7 +285,7 @@ class TransferClient:
             # do not support buffer copy
             # send data in batches
             client, is_cached = await router.get_client(
-                address, from_who=type(self), return_from_cache=True
+                address, from_who=self, return_from_cache=True
             )
             if not is_cached:
                 # tell server to switch to transfer dedicated channel
@@ -299,7 +299,7 @@ class TransferClient:
                 )
         else:
             client, is_cached = await router.get_client_via_type(
-                address, client_type, from_who=type(self), return_from_cache=True
+                address, client_type, from_who=self, return_from_cache=True
             )
             if not is_cached:
                 # tell server to switch to transfer dedicated channel
@@ -339,7 +339,7 @@ class TransferClient:
         ), "`copyto_via_file_objects` can only be used inside pools"
         address = remote_file_object_refs[0].address
         client, is_cached = await router.get_client(
-            address, from_who=type(self), return_from_cache=True
+            address, from_who=self, return_from_cache=True
         )
         if not is_cached:
             # tell server to switch to transfer dedicated channel
