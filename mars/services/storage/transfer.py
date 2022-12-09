@@ -15,10 +15,10 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Tuple, Union, Set
 
 from ... import oscar as mo
-from ...lib.aio import alru_cache
+from ...lib.aio import alru_cache, AioFileObject
 from ...storage import StorageLevel
 from ...utils import dataslots
 from .core import DataManagerActor, WrappedStorageFileObject
@@ -62,6 +62,7 @@ class SenderManagerActor(mo.StatelessActor):
 
     async def _send_data(
         self,
+        readers: List[AioFileObject],
         receiver_ref: mo.ActorRefType["ReceiverManagerActor"],
         session_id: str,
         data_keys: List[str],
@@ -91,12 +92,6 @@ class SenderManagerActor(mo.StatelessActor):
                     await self.flush()
 
         sender = BufferedSender()
-        open_reader_tasks = []
-        for data_key in data_keys:
-            open_reader_tasks.append(
-                self._storage_handler.open_reader.delay(session_id, data_key)
-            )
-        readers = await self._storage_handler.open_reader.batch(*open_reader_tasks)
 
         for data_key, reader in zip(data_keys, readers):
             while True:
@@ -125,6 +120,7 @@ class SenderManagerActor(mo.StatelessActor):
         band_name: str = "numa-0",
         block_size: int = None,
         error: str = "raise",
+        enable_oscar_copyto=True,
     ):
         logger.debug(
             "Begin to send data (%s, %s) to %s", session_id, data_keys, address
@@ -174,7 +170,7 @@ class SenderManagerActor(mo.StatelessActor):
         data_sizes = [info.store_size for info in infos]
         if level is None:
             level = infos[0].level
-        is_transferring_list = await receiver_ref.open_writers(
+        is_transferring_list, data_key_to_buffer_refs = await receiver_ref.open_writers(
             session_id, data_keys, data_sizes, level, sub_infos
         )
         to_send_keys = []
@@ -186,7 +182,43 @@ class SenderManagerActor(mo.StatelessActor):
                 to_send_keys.append(data_key)
 
         if to_send_keys:
-            await self._send_data(receiver_ref, session_id, to_send_keys, block_size)
+            open_reader_tasks = []
+            for data_key in data_keys:
+                open_reader_tasks.append(
+                    self._storage_handler.open_reader.delay(session_id, data_key)
+                )
+            readers = await self._storage_handler.open_reader.batch(*open_reader_tasks)
+
+            local_buffers = []
+            remote_buffer_refs = []
+            copied_keys = set()
+            if enable_oscar_copyto:
+                rest_readers = []
+                rest_keys = []
+                for data_key, reader in zip(data_keys, readers):
+                    try:
+                        local_buffer = reader.get_buffer()
+                        remote_buffer_ref = data_key_to_buffer_refs[data_key]
+                        local_buffers.append(local_buffer)
+                        remote_buffer_refs.append(remote_buffer_ref)
+                        copied_keys.add(data_key)
+                    except (KeyError, AttributeError):
+                        rest_readers.append(reader)
+                        rest_keys.append(data_key)
+
+                if local_buffers:
+                    with mo.temp_transfer_block_size(block_size):
+                        # for data that supports buffer protocol on both sides
+                        # hand over to oscar to transfer data
+                        await mo.copyto_via_buffers(local_buffers, remote_buffer_refs)
+                        await receiver_ref.close_writers(session_id, copied_keys)
+            else:
+                rest_keys = to_send_keys
+                rest_readers = readers
+            if rest_keys:
+                await self._send_data(
+                    rest_readers, receiver_ref, session_id, rest_keys, block_size
+                )
         if to_wait_keys:
             await receiver_ref.wait_transfer_done(session_id, to_wait_keys)
         unpin_tasks = []
@@ -249,11 +281,12 @@ class ReceiverManagerActor(mo.StatelessActor):
         data_sizes: List[int],
         level: StorageLevel,
         sub_infos: List,
-    ):
+    ) -> Tuple[List[bool], Dict[str, mo.BufferRef]]:
         tasks = dict()
         key_to_sub_infos = dict()
         data_key_to_size = dict()
         being_processed = []
+        data_key_to_buffer_refs = dict()
         for data_key, data_size, sub_info in zip(data_keys, data_sizes, sub_infos):
             data_key_to_size[data_key] = data_size
             if (session_id, data_key) not in self._writing_infos:
@@ -275,7 +308,15 @@ class ReceiverManagerActor(mo.StatelessActor):
                 )
                 if key_to_sub_infos[data_key] is not None:
                     writer._sub_key_infos = key_to_sub_infos[data_key]
-        return being_processed
+                try:
+                    buffer = writer.get_buffer()
+                except AttributeError:
+                    pass
+                else:
+                    buffer_ref = mo.buffer_ref(self.address, buffer)
+                    data_key_to_buffer_refs[data_key] = buffer_ref
+
+        return being_processed, data_key_to_buffer_refs
 
     async def open_writers(
         self,
@@ -301,18 +342,25 @@ class ReceiverManagerActor(mo.StatelessActor):
         self, data: list, session_id: str, data_keys: List[str], eof_marks: List[bool]
     ):
         # close may be a high-cost operation, use create_task
-        close_tasks = []
         finished_keys = []
         for data, data_key, is_eof in zip(data, data_keys, eof_marks):
             writer = self._writing_infos[(session_id, data_key)].writer
             if data:
                 await writer.write(data)
             if is_eof:
-                close_tasks.append(writer.close())
                 finished_keys.append(data_key)
+        await self.close_writers(session_id, finished_keys)
+
+    async def close_writers(
+        self, session_id: str, data_keys: Union[List[str], Set[str]]
+    ):
+        close_tasks = []
+        for data_key in data_keys:
+            writer = self._writing_infos[(session_id, data_key)].writer
+            close_tasks.append(writer.close())
         await asyncio.gather(*close_tasks)
         async with self._lock:
-            for data_key in finished_keys:
+            for data_key in data_keys:
                 event = self._writing_infos[(session_id, data_key)].event
                 event.set()
                 self._decref_writing_key(session_id, data_key)

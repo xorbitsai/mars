@@ -13,8 +13,11 @@
 # limitations under the License.
 
 from urllib.parse import urlparse
+from typing import Any, List
 
-from .core cimport ActorRef
+from ..lib.aio import AioFileObject
+from .._utils cimport new_random_id
+from .core cimport ActorRef, BufferRef, FileObjectRef
 from .utils cimport new_actor_id
 from .utils import create_actor_ref
 
@@ -178,6 +181,69 @@ cdef class BaseActorContext:
         """
         raise NotImplementedError
 
+    def buffer_ref(self, str address, object buf) -> BufferRef:
+        """
+        Create a reference to a buffer
+
+        Parameters
+        ----------
+        address
+            address of the actor pool
+        buf
+            buffer object
+
+        Returns
+        -------
+        BufferRef
+        """
+        return BufferRef.create(buf, address, new_random_id(32))
+
+    def file_object_ref(self, str address, object file_object) -> FileObjectRef:
+        """
+        Create a reference to a file object
+
+        Parameters
+        ----------
+        address
+            address of the actor pool
+        file_object
+            file object
+
+        Returns
+        -------
+        FileObjectRef
+        """
+        return FileObjectRef.create(file_object, address, new_random_id(32))
+
+    async def copyto_via_buffers(self, local_buffers: list, remote_buffer_refs: List[BufferRef]):
+        """
+        Copy local buffers to remote buffers.
+
+        Parameters
+        ----------
+        local_buffers
+            Local buffers.
+        remote_buffer_refs
+            Remote buffer refs
+        """
+        raise NotImplementedError
+
+    async def copyto_via_file_objects(
+        self,
+        local_file_objects: List[AioFileObject],
+        remote_file_object_refs: List[FileObjectRef]
+    ):
+        """
+        Copy data from local file objects into remote file objects.
+
+        Parameters
+        ----------
+        local_file_objects
+            Local file objects
+        remote_file_object_refs
+            Remote file object refs
+        """
+
 
 cdef class ClientActorContext(BaseActorContext):
     """
@@ -255,6 +321,32 @@ cdef class ClientActorContext(BaseActorContext):
     def get_pool_config(self, str address):
         context = self._get_backend_context(address)
         return context.get_pool_config(address)
+
+    def buffer_ref(self, str address, buf: Any) -> BufferRef:
+        context = self._get_backend_context(address)
+        return context.buffer_ref(address, buf)
+
+    def file_object_ref(self, str address, file_object: AioFileObject) -> FileObjectRef:
+        context = self._get_backend_context(address)
+        return context.file_object_ref(address, file_object)
+
+    def copyto_via_buffers(self, local_buffers: list, remote_buffer_refs: List[BufferRef]):
+        if remote_buffer_refs:
+            address = remote_buffer_refs[0].address
+            context = self._get_backend_context(address)
+            return context.copyto_via_buffers(local_buffers, remote_buffer_refs)
+        else:
+            raise ValueError('buffer size should be at least 1')
+
+    def copyto_via_file_objects(
+        self,
+        local_file_objects: List[AioFileObject],
+        remote_file_object_refs: List[FileObjectRef]
+    ):
+        if remote_file_object_refs:
+            address = remote_file_object_refs[0].address
+            context = self._get_backend_context(address)
+            return context.copyto_via_file_objects(local_file_objects, remote_file_object_refs)
 
 
 def register_backend_context(scheme, cls):

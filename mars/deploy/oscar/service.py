@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import urllib.parse
 from typing import List, Dict, Union
 
 from ...oscar import ServerClosed
@@ -20,6 +21,17 @@ from ...resource import Resource
 from ...services import start_services, stop_services, NodeRole
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_lookup_address(addr: str, config: dict):
+    scheme = urllib.parse.urlparse(addr).scheme if "://" in addr else None
+    if scheme and config["cluster"].get("lookup_address"):
+        config["cluster"]["lookup_address"] = ",".join(
+            [
+                f"{scheme}://{laddr}" if not laddr.startswith(scheme) else laddr
+                for laddr in config["cluster"]["lookup_address"].split(",")
+            ]
+        )
 
 
 async def start_supervisor(
@@ -39,6 +51,7 @@ async def start_supervisor(
         config["services"].append("web")
     if modules:
         config["modules"] = modules
+    _normalize_lookup_address(address, config)
     try:
         await start_services(NodeRole.SUPERVISOR, config, address=address)
         logger.debug("Mars supervisor started at %s", address)
@@ -84,6 +97,7 @@ async def start_worker(
             config["storage"]["backends"].append("cuda")
     if modules:
         config["modules"] = modules
+    _normalize_lookup_address(address, config)
     await start_services(
         NodeRole.WORKER, config, address=address, mark_ready=mark_ready
     )

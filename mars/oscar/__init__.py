@@ -32,11 +32,20 @@ from .api import (
     setup_cluster,
     wait_actor_pool_recovered,
     get_pool_config,
+    copyto_via_buffers,
+    copyto_via_file_objects,
+    buffer_ref,
+    file_object_ref,
 )
 from .backends import allocate_strategy
 from .backends.pool import MainActorPoolType
+from .backends.transfer import temp_transfer_block_size
 from .batch import extensible
-from .core import ActorRef
+from .core import (
+    ActorRef,
+    BufferRef,
+    FileObjectRef,
+)  # noqa: F401 # pylint: disable=unused-import
 from .debug import set_debug_options, get_debug_options, DebugOptions
 from .errors import (
     ActorNotExist,

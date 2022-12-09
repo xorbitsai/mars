@@ -22,7 +22,7 @@ import pandas as pd
 import pytest
 
 from .....lib.aio import AioEvent
-from .....tests.core import require_cudf, require_cupy
+from .....tests.core import require_cudf, require_cupy, require_ucx
 from .....utils import get_next_port, lazy_import
 from .. import (
     Channel,
@@ -37,6 +37,7 @@ from .. import (
     DummyClient,
     Server,
     UCXServer,
+    UCXChannel,
 )
 from ..ucx import UCXInitializer
 
@@ -220,6 +221,35 @@ async def test_multiprocess_cuda_comm(server_type):
     assert "success" == await client.recv()
 
     await client.close()
+
+
+@require_ucx
+@pytest.mark.asyncio
+async def test_ucx_channel():
+    size = 2**5
+
+    async def handle_channel(channel: UCXChannel):
+        assert await channel.recv() == 1
+        buffer = np.empty(size, dtype="u1")
+        await channel.recv_buffers([buffer])
+        await channel.send_buffers([buffer])
+
+    # create server
+    addr = f"127.0.0.1:{get_next_port()}"
+    server = await UCXServer.create({"address": addr, "handle_channel": handle_channel})
+    await server.start()
+    assert isinstance(server.info, dict)
+
+    # create client
+    client = await UCXServer.client_type.connect(addr)
+    buf = np.zeros(size, dtype="u1")
+    buf += 1
+    await client.send_objects_and_buffers([1], [buf])
+    new_buf = np.empty_like(buf)
+    await client.recv_buffers([new_buf])
+    np.testing.assert_array_equal(buf, new_buf)
+
+    await server.stop()
 
 
 def test_get_client_type():

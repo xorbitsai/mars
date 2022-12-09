@@ -41,6 +41,7 @@ from .message import (
     ControlMessageType,
 )
 from .router import Router
+from .transfer import TransferClient
 
 
 @dataslots
@@ -49,12 +50,13 @@ class ProfilingContext:
     task_id: str
 
 
-class MarsActorContext(BaseActorContext):
+class MarsActorContext(TransferClient, BaseActorContext):
     __slots__ = ("_caller",)
 
     support_allocate_strategy = True
 
     def __init__(self, address: str = None):
+        TransferClient.__init__(self)
         BaseActorContext.__init__(self, address)
         self._caller = ActorCaller()
 

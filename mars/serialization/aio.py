@@ -15,12 +15,12 @@
 import asyncio
 import struct
 from io import BytesIO
-from typing import Any, Union, BinaryIO
+from typing import Any
 
 import cloudpickle
 import numpy as np
 
-from ..utils import lazy_import
+from ..utils import lazy_import, is_cuda_buffer
 from .core import serialize_with_spawn, deserialize
 
 rmm = lazy_import("rmm")
@@ -40,10 +40,7 @@ class AioSerializer:
             self._obj, spawn_threshold=DEFAULT_SPAWN_THRESHOLD
         )
 
-        def _is_cuda_buffer(buf: Union["rmm.DeviceBuffer", BinaryIO]):
-            return hasattr(buf, "__cuda_array_interface__")
-
-        is_cuda_buffers = [_is_cuda_buffer(buf) for buf in buffers]
+        is_cuda_buffers = [is_cuda_buffer(buf) for buf in buffers]
         headers[0]["is_cuda_buffers"] = np.array(is_cuda_buffers)
 
         # add buffer lengths into headers

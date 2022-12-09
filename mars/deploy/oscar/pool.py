@@ -209,7 +209,7 @@ async def create_worker_actor_pool(
     gpu_enable_internal_address = gpu_config.get("enable_internal_addr")
     extra_conf = oscar_config.get("extra_conf", dict())
 
-    if cuda_devices is None:  # pragma: no cover
+    if cuda_devices is None:
         env_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
         if not env_devices:
             cuda_devices = list(range(cuda_count()))
