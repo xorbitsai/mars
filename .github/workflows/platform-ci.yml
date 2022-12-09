@@ -72,7 +72,7 @@ jobs:
 
           source ./ci/rewrite-cov-config.sh
 
-          pip install numpy scipy cython
+          pip install numpy scipy cython "scikit-learn<1.2.0"
 
           pip install -e ".[dev,extra]"
 
@@ -115,7 +115,7 @@ jobs:
               pip install "pandas<1.4"
             fi
             if [ -n "$RUN_DASK" ]; then
-              pip install dask[complete] mimesis "scikit-learn<1.2.0"
+              pip install dask[complete] mimesis
             fi
           fi
           conda list -n test
