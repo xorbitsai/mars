@@ -89,14 +89,11 @@ class OscarCommandRunner:
         self.logging_conf["from_cmd"] = True
 
     def _get_logging_config_paths(self):
-        import mars
-
         log_conf = self.args.log_conf or "logging.conf"
 
         return [
             log_conf,
             os.path.join(os.path.abspath("."), log_conf),
-            os.path.join(os.path.dirname(os.path.dirname(mars.__file__)), log_conf),
             os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "file-logging.conf"
             ),
