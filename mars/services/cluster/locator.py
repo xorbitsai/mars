@@ -14,7 +14,7 @@
 
 import asyncio
 import logging
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from ... import oscar as mo
 from ...lib.uhashring import HashRing
@@ -61,11 +61,16 @@ class SupervisorLocatorActor(mo.Actor):
     def _watch_supervisors_from_backend(self):
         raise NotImplementedError
 
+    def _if_set_supervisors(
+        self, current_supervisors: Set[str], last_supervisors: Set[str]
+    ):
+        return current_supervisors != last_supervisors
+
     async def _watch_supervisor_changes(self):
         last_supervisors = set()
         try:
             async for sv_list in self._watch_supervisors_from_backend():
-                if set(sv_list) != last_supervisors:
+                if self._if_set_supervisors(set(sv_list), last_supervisors):
                     await self._set_supervisors(sv_list)
                     last_supervisors = set(sv_list)
         except asyncio.CancelledError:
