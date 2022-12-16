@@ -24,7 +24,6 @@ import pytest
 from .. import new_session
 from .. import tensor as mt
 from ..services.cluster import NodeRole, WebClusterAPI
-from ..tests.core import flaky
 from ..utils import get_next_port
 
 
@@ -47,7 +46,6 @@ def _terminate(pid: int):
             continue
 
 
-@flaky(max_runs=3)
 @pytest.mark.asyncio
 async def test_cluster():
     port = get_next_port()
@@ -60,6 +58,9 @@ async def test_cluster():
     with os.fdopen(fd, mode="w") as f:
         f.write(CONFIG_CONTENT)
 
+    w = subprocess.Popen(
+        [sys.executable, "-m", "mars.worker", "-s", supervisor_addr, "-f", path]
+    )
     r = subprocess.Popen(
         [
             sys.executable,
@@ -76,9 +77,6 @@ async def test_cluster():
         ],
         stderr=subprocess.PIPE,
     )
-    w = subprocess.Popen(
-        [sys.executable, "-m", "mars.worker", "-s", supervisor_addr, "-f", path]
-    )
 
     for p in [r, w]:
         try:
@@ -89,23 +87,10 @@ async def test_cluster():
             continue
         else:
             if retcode:
-                std_err = r.communicate()[1].decode()
-                p.kill()
+                std_err = p.communicate()[1].decode()
+                _terminate(r.pid)
+                _terminate(w.pid)
                 raise RuntimeError("Start cluster failed, stderr: \n" + std_err)
-
-    def _check(timeout: float = 1.0):
-        for p in [r, w]:
-            try:
-                retcode = p.wait(timeout)
-            except subprocess.TimeoutExpired:
-                # supervisor & worker will run forever,
-                # timeout means everything goes well, at least looks well,
-                continue
-            else:
-                if retcode:
-                    std_err = r.communicate()[1].decode()
-                    p.kill()
-                    raise RuntimeError("Start cluster failed, stderr: \n" + std_err)
 
     try:
         cluster_api = WebClusterAPI(web_addr)
@@ -113,7 +98,7 @@ async def test_cluster():
             try:
                 jsn = await cluster_api.get_nodes_info(role=NodeRole.WORKER)
             except ConnectionError:
-                await asyncio.to_thread(_check, timeout=0.5)
+                await asyncio.sleep(0.5)
                 continue
             if not jsn:
                 await asyncio.sleep(0.5)

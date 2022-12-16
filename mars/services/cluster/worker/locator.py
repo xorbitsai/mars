@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import List
+from typing import List, Set
 
 from .... import oscar as mo
 from ..core import NodeRole, NodeStatus
@@ -32,6 +32,11 @@ class WorkerSupervisorLocatorActor(SupervisorLocatorActor):
     @classmethod
     def default_uid(cls):
         return SupervisorLocatorActor.__name__
+
+    def _if_set_supervisors(
+        self, current_supervisors: Set[str], last_supervisors: Set[str]
+    ):
+        return current_supervisors != last_supervisors or self._node_info_ref is None
 
     async def _set_supervisors(self, supervisors: List[str]):
         await super()._set_supervisors(supervisors)
