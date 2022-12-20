@@ -185,7 +185,7 @@ class TensorFillDiagonal(TensorOperand, TensorOperandMixin):
         # on the diagonal direction
         in_tensor = op.input
         nsplits = [tuple(np.array(split)) for split in in_tensor.nsplits]
-        if set(nsplits) != 1:
+        if len(set(nsplits)) != 1:
             # need rechunk
             nsplit = decide_unify_split(*in_tensor.nsplits)
             in_tensor = yield from recursive_tile(
