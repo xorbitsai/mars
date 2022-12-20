@@ -51,9 +51,26 @@ def _parse_file_logging_config(
     formatter: Optional[str] = None,
     from_cmd: bool = False,
 ) -> configparser.RawConfigParser:
-    root_level, root_fmt = _get_root_logger_level_and_format()
-    level = level or root_level
-    formatter = formatter or root_fmt
+    """
+    If env is ipython (from_cmd=False), the log level and format on the web follow our default configuration file,
+    and the level and format on the console use the user's configuration (logging.basicConfig) or keep the default.
+
+    If env is cmd (from_cmd=True, e.g. user invokes `python -m mars.worker`),
+    the log level and format on the web and console follow user's config (--log-level and --log-format)
+    or our default configuration file.
+
+    Parameters
+    ----------
+    file_path
+    log_path
+    level
+    formatter
+    from_cmd
+
+    Returns
+    -------
+
+    """
     config = configparser.RawConfigParser()
     config.read(file_path)
     logger_sections = [
@@ -70,8 +87,8 @@ def _parse_file_logging_config(
     ]
     all_sections = config.sections()
     for section in logger_sections:
-        if section in all_sections:
-            config[section]["level"] = level.upper() if level else "INFO"
+        if level and section in all_sections:
+            config[section]["level"] = level.upper()
 
     if "handler_file_handler" in config:
         if sys.platform.startswith("win"):
@@ -86,8 +103,14 @@ def _parse_file_logging_config(
     # need to judge that whether handler_stream_handler section is in the config.
     if not from_cmd and stream_handler_sec in all_sections:
         # console log keeps the default level as root logger
-        # file log on the web uses info level and the formatter in the config file
+        # file log on the web uses level and the formatter in the config file
+        root_level, root_fmt = _get_root_logger_level_and_format()
         config[stream_handler_sec]["level"] = root_level or "WARN"
+        if root_fmt:
+            config.add_section("formatter_console")
+            config["formatter_console"]["format"] = root_fmt
+            config["formatters"]["keys"] += ",console"
+            config[stream_handler_sec]["formatter"] = "console"
     return config
 
 
