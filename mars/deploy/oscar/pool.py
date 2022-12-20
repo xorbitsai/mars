@@ -99,12 +99,13 @@ def _parse_file_logging_config(
         config[format_section]["format"] = formatter
 
     stream_handler_sec = "handler_stream_handler"
+    file_handler_sec = "handler_file_handler"
     # If not from cmd (like ipython) and user uses its own config file,
     # need to judge that whether handler_stream_handler section is in the config.
     if not from_cmd and stream_handler_sec in all_sections:
-        # console log keeps the default level as root logger
-        # file log on the web uses level and the formatter in the config file
+        # console and web log keeps the default config as root logger
         root_level, root_fmt = _get_root_logger_level_and_format()
+        config[file_handler_sec]["level"] = root_level or "WARN"
         config[stream_handler_sec]["level"] = root_level or "WARN"
         if root_fmt:
             config.add_section("formatter_console")

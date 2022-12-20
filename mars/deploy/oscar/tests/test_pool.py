@@ -57,7 +57,10 @@ def test_parse_file_logging_config(init):
     assert config["handler_stream_handler"].get("formatter") is not None
     assert config["handler_stream_handler"]["formatter"] == "console"
     for sec in sections:
-        assert config[sec]["level"] == "FATAL"
+        if sec != "handler_file_handler":
+            assert config[sec]["level"] == "FATAL"
+        else:
+            assert config[sec]["level"] == root_level
 
     formatter = "foo"
     config = _parse_file_logging_config(fp, log_path, "FATAL", formatter=formatter)
