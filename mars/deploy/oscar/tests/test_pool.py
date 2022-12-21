@@ -55,24 +55,26 @@ def test_parse_file_logging_config(init):
     config = _parse_file_logging_config(fp, log_path, "FATAL")
     assert config["handler_stream_handler"]["level"] == root_level
     assert config["handler_stream_handler"].get("formatter") is not None
+    assert config["handler_stream_handler"]["formatter"] == "console"
     for sec in sections:
-        assert config[sec]["level"] == "FATAL"
+        if sec != "handler_file_handler":
+            assert config[sec]["level"] == "FATAL"
+        else:
+            assert config[sec]["level"] == root_level
 
     formatter = "foo"
     config = _parse_file_logging_config(fp, log_path, "FATAL", formatter=formatter)
     assert config["formatter_formatter"]["format"] == formatter
 
     config = _parse_file_logging_config(fp, log_path, level="", formatter=formatter)
-    for sec in sections:
-        assert config[sec]["level"] == root_level
+    assert config["logger_dataframe"]["level"] == "DEBUG"
 
     config = _parse_file_logging_config(
         fp, log_path, level="", formatter=formatter, from_cmd=True
     )
-    for sec in sections:
-        assert config[sec]["level"] == root_level
+    assert config["logger_tensor"]["level"] == "DEBUG"
 
-    assert config["handler_stream_handler"]["level"] == root_level
+    assert config["handler_stream_handler"]["level"] == "DEBUG"
     assert config["formatter_formatter"]["format"] == formatter
 
 
@@ -102,7 +104,7 @@ def test_config_logging(init, caplog):
                 file_handler = handler
         assert cnt == 1
         assert file_handler is not None
-        assert file_handler.level == logging.getLevelName(root_level)
+        assert file_handler.level == logging.getLevelName("DEBUG")
         assert file_handler.baseFilename == os.environ.get(MARS_LOG_PATH_KEY)
 
 

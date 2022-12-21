@@ -104,7 +104,7 @@ class OscarCommandRunner:
 
         # get level and format cmd line config
         log_level = self.args.log_level
-        level = log_level.upper() if log_level else "INFO"
+        level = log_level.upper() if log_level else None
         self.logging_conf["level"] = level
         formatter = self.args.log_format
         if formatter:
