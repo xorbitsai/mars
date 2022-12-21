@@ -58,18 +58,6 @@ def _parse_file_logging_config(
     If env is cmd (from_cmd=True, e.g. user invokes `python -m mars.worker`),
     the log level and format on the web and console follow user's config (--log-level and --log-format)
     or our default configuration file.
-
-    Parameters
-    ----------
-    file_path
-    log_path
-    level
-    formatter
-    from_cmd
-
-    Returns
-    -------
-
     """
     config = configparser.RawConfigParser()
     config.read(file_path)
