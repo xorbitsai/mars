@@ -920,6 +920,12 @@ def test_dataframe_aggregate(setup, check_ref_counts):
         data.agg({0: ["sum", "min", "var"], 9: ["mean", "var", "std"]}),
     )
 
+    result = df.agg({0: [sum, np.min, "var"], 9: ["mean", "var", "std"]})
+    pd.testing.assert_frame_equal(
+        result.execute().fetch(),
+        data.agg({0: [sum, np.min, "var"], 9: ["mean", "var", "std"]}),
+    )
+
     if _support_kw_agg:
         agg_kw = dict(
             sum_0=NamedAgg(0, "sum"),
