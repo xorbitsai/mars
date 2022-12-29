@@ -627,7 +627,6 @@ def build_fetch_chunk(chunk: ChunkType, **kwargs) -> ChunkType:
         is_broadcaster=chunk.is_broadcaster,
         kws=[params],
         _key=chunk.key,
-        _id=chunk.id,
         **kwargs,
     )
 

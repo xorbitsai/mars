@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 
 IN_RAY_CI = os.environ.get("MARS_CI_BACKEND", "mars") == "ray"
 # The default interval seconds to update progress and collect garbage.
-DEFAULT_SUBTASK_MONITOR_INTERVAL = 0 if IN_RAY_CI else 1
+DEFAULT_MONITOR_INTERVAL_SECONDS = 0 if IN_RAY_CI else 1
+DEFAULT_LOG_INTERVAL_SECONDS = 60
+DEFAULT_CHECK_SLOW_SUBTASKS_INTERVAL_SECONDS = 120
 
 
 @register_config_cls
@@ -53,23 +55,46 @@ class RayExecutionConfig(ExecutionConfig):
     def get_subtask_num_cpus(self) -> Union[int, float]:
         return self._ray_execution_config.get("subtask_num_cpus", 1)
 
+    def get_subtask_memory(self) -> Union[int, float]:
+        return self._ray_execution_config.get("subtask_memory", None)
+
     def get_n_cpu(self):
         return self._ray_execution_config["n_cpu"]
 
     def get_n_worker(self):
         return self._ray_execution_config["n_worker"]
 
-    def get_subtask_cancel_timeout(self):
-        return self._ray_execution_config["subtask_cancel_timeout"]
-
-    def get_subtask_monitor_interval(self):
+    def get_monitor_interval_seconds(self):
         """
         The interval seconds for the monitor task to update progress and
         collect garbage.
         """
         return self._ray_execution_config.get(
-            "subtask_monitor_interval", DEFAULT_SUBTASK_MONITOR_INTERVAL
+            "monitor_interval_seconds", DEFAULT_MONITOR_INTERVAL_SECONDS
         )
+
+    def get_log_interval_seconds(self):
+        return self._ray_execution_config.get(
+            "log_interval_seconds", DEFAULT_LOG_INTERVAL_SECONDS
+        )
+
+    def get_check_slow_subtasks_interval_seconds(self) -> float:
+        return self._ray_execution_config.get(
+            "check_slow_subtasks_interval_seconds",
+            DEFAULT_CHECK_SLOW_SUBTASKS_INTERVAL_SECONDS,
+        )
+
+    def get_check_slow_subtask_iqr_ratio(self) -> float:
+        # https://en.wikipedia.org/wiki/Box_plot
+        # iqr = q3 - q1
+        # duration_threshold = q3 + check_slow_subtasks_iqr_ratio * (q3 - q1)
+        # So, the value == 3, extremely slow(probably hang); value == 1.5, slow
+        return self._ray_execution_config.get("check_slow_subtasks_iqr_ratio", 3)
 
     def get_shuffle_fetch_type(self) -> ShuffleFetchType:
         return ShuffleFetchType.FETCH_BY_INDEX
+
+    def get_gc_method(self):
+        method = self._ray_execution_config.get("gc_method", "submitted")
+        assert method in ["submitted", "completed"]
+        return method
