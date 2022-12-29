@@ -369,15 +369,25 @@ class DataFrameCut(DataFrameOperand, DataFrameOperandMixin):
         bins = ctx[op.bins.key] if isinstance(op.bins, ENTITY_TYPE) else op.bins
         labels = ctx[op.labels.key] if isinstance(op.labels, ENTITY_TYPE) else op.labels
 
-        cut = partial(
-            pd.cut,
-            right=op.right,
-            retbins=op.retbins,
-            precision=op.precision,
-            include_lowest=op.include_lowest,
-            duplicates=op.duplicates,
-            ordered=op.ordered,
-        )
+        if pd.__version__ >= "1.1.0":
+            cut = partial(
+                pd.cut,
+                right=op.right,
+                retbins=op.retbins,
+                precision=op.precision,
+                include_lowest=op.include_lowest,
+                duplicates=op.duplicates,
+                ordered=op.ordered,
+            )
+        else:
+            cut = partial(
+                pd.cut,
+                right=op.right,
+                retbins=op.retbins,
+                precision=op.precision,
+                include_lowest=op.include_lowest,
+                duplicates=op.duplicates,
+            )
         try:
             ret = cut(x, bins, labels=labels)
         except ValueError:
