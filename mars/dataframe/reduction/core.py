@@ -852,7 +852,11 @@ class ReductionCompiler:
             func_name = f"<custom_{self._custom_counter}>"
             self._custom_counter += 1
 
-        if inspect.isbuiltin(func) or func.__module__.split(".")[0] == "numpy":
+        if (
+            inspect.isbuiltin(func)
+            or hasattr(func, "__module__")
+            and func.__module__.split(".")[0] == "numpy"
+        ):
             raw_func_name = getattr(func, "__name__", None)
             if raw_func_name in ["amax", "amin"]:
                 raw_func_name = raw_func_name.strip("a")
