@@ -115,15 +115,15 @@ def test_use_c_group_stats():
     with os.fdopen(fd, "w") as f:
         f.write(_memory_stat_content)
 
-    old_cpu_stat_file = resource.CGROUP_CPU_STAT_FILE
-    old_mem_stat_file = resource.CGROUP_MEM_STAT_FILE
+    old_cpu_stat_file = resource.CGROUP_V1_CPU_ACCT_FILE
+    old_mem_stat_file = resource.CGROUP_V1_MEM_STAT_FILE
     old_shm_path = resource._shm_path
     try:
         os.environ["MARS_USE_CGROUP_STAT"] = "1"
 
         resource = importlib.reload(resource)
-        resource.CGROUP_CPU_STAT_FILE = cpu_stat_path
-        resource.CGROUP_MEM_STAT_FILE = mem_stat_path
+        resource.CGROUP_V1_CPU_ACCT_FILE = cpu_stat_path
+        resource.CGROUP_V1_MEM_STAT_FILE = mem_stat_path
         resource._shm_path = None
 
         assert resource.cpu_percent() is None
@@ -137,8 +137,8 @@ def test_use_c_group_stats():
         assert mem_stats.total == 1073741824
         assert mem_stats.used == 218181632
     finally:
-        resource.CGROUP_CPU_STAT_FILE = old_cpu_stat_file
-        resource.CGROUP_MEM_STAT_FILE = old_mem_stat_file
+        resource.CGROUP_V1_CPU_ACCT_FILE = old_cpu_stat_file
+        resource.CGROUP_V1_MEM_STAT_FILE = old_mem_stat_file
         resource._shm_path = old_shm_path
         del os.environ["MARS_USE_CGROUP_STAT"]
         os.unlink(cpu_stat_path)
