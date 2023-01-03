@@ -102,8 +102,8 @@ def virtual_memory() -> _virt_memory_stat:
             # see Memory section in https://www.kernel.org/doc/Documentation/cgroup-v2.txt
             max_mem = min(_mem_total or sys_mem.total, sys_mem.total)
             with open(CGROUP_V2_MEM_MAX_FILE, "r") as mem_max_file:
-                max_str = mem_max_file.read()
-                total = max_mem if "max" in max_str else int(max_str)
+                max_str = mem_max_file.read().strip()
+                total = max_mem if max_str == "max" else int(max_str)
             with open(CGROUP_V2_MEM_CURRENT_FILE, "r") as mem_current_file:
                 used = int(mem_current_file.read())
         else:
