@@ -58,4 +58,12 @@ class PlotAccessor:
     def _register(cls, method):
         doc = getattr(pd.DataFrame.plot, method).__doc__
         new_doc = adapt_mars_docstring(doc)
+        if method == "hexbin":
+            # make doc pass
+            new_doc = new_doc.replace(
+                "reduce_C_function=mt.sum", "reduce_C_function=sum"
+            )
+        elif method == "line":
+            new_doc = new_doc.replace("s.plot.line().execute()", "s.plot.line()")
+            new_doc = new_doc.replace("type(axes).execute()", "type(axes)")
         setattr(cls, method, cls._gen_func(method, new_doc))
