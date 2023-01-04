@@ -91,7 +91,10 @@ def generate_range_count(
                 break
 
             # faster than cur + offset
-            next_date = offset._apply(cur)
+            try:
+                next_date = offset._apply(cur)
+            except AttributeError:
+                next_date = cur + offset
             if next_date <= cur:
                 raise ValueError(f"Offset {offset} did not increment date")
             cur = next_date
@@ -105,7 +108,10 @@ def generate_range_count(
                 break
 
             # faster than cur + offset
-            next_date = offset._apply(cur)
+            try:
+                next_date = offset._apply(cur)
+            except AttributeError:
+                next_date = cur + offset
             if next_date >= cur:
                 raise ValueError(f"Offset {offset} did not decrement date")
             cur = next_date
