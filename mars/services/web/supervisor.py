@@ -42,16 +42,18 @@ class WebActor(mo.Actor):
                 pass
 
     async def __post_create__(self):
-        from .handlers import handlers, IndexHandler
+        from .handlers import handlers, static_handlers
 
         supervisor_addr = self.address
 
         host = self._config.get("host") or "0.0.0.0"
         port = self._config.get("port") or get_next_port()
         self._web_address = f"http://{host}:{port}"
-        handlers.append(("/", IndexHandler, {"supervisor_addr": supervisor_addr}))
-        for p, h in self._config.get("web_handlers", {}).items():
-            handlers.append((p, h, {"supervisor_addr": supervisor_addr}))
+        handlers.update(self._config.get("web_handlers", {}))
+        web_handlers = []
+        for p, h in handlers.items():
+            web_handlers.append((p, h, {"supervisor_addr": supervisor_addr}))
+        web_handlers.extend(static_handlers)
 
         retrial = 5
         while retrial:
@@ -60,7 +62,7 @@ class WebActor(mo.Actor):
                     port = get_next_port()
 
                 # For debugging tornado, use debug=True to enable hot deploy
-                self._web_app = web.Application(handlers)
+                self._web_app = web.Application(web_handlers)
                 self._web_server = self._web_app.listen(port, host)
                 logger.info("Mars Web started at %s:%d", host, port)
                 break

@@ -35,7 +35,9 @@ class IndexHandler(MarsRequestHandler):
         self.write(self._get_index_page())
 
 
-handlers = [
+handlers = {"/": IndexHandler}
+
+static_handlers = [
     (
         r"[^\?\&]*/static/(.*)",
         web.StaticFileHandler,
