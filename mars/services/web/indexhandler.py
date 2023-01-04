@@ -14,6 +14,9 @@
 
 import os
 
+from tornado import web
+from typing import Dict, Type
+
 from .core import MarsRequestHandler
 
 
@@ -34,5 +37,12 @@ class IndexHandler(MarsRequestHandler):
 
 
 handlers = {
-    "/": IndexHandler,
+    r"[^\?\&]*/static/(.*)": (
+        web.StaticFileHandler,
+        {"path": os.path.join(os.path.dirname(__file__), "static")},
+    )
 }
+
+
+def register_handler(path: str, handler: Type[web.RequestHandler], args: Dict):
+    handlers[path] = (handler, args)
