@@ -53,7 +53,7 @@ class WebActor(mo.Actor):
         web_handlers = []
         for p, h in handlers.items():
             web_handlers.append((p, h, {"supervisor_addr": supervisor_addr}))
-        web_handlers.extend(static_handlers)
+        web_handlers.extend([(*[p], *v) for p, v in static_handlers.items()])
 
         retrial = 5
         while retrial:

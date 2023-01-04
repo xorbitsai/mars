@@ -37,10 +37,9 @@ class IndexHandler(MarsRequestHandler):
 
 handlers = {"/": IndexHandler}
 
-static_handlers = [
-    (
-        r"[^\?\&]*/static/(.*)",
+static_handlers = {
+    r"[^\?\&]*/static/(.*)": (
         web.StaticFileHandler,
         {"path": os.path.join(os.path.dirname(__file__), "static")},
     )
-]
+}
