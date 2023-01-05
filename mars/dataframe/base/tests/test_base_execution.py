@@ -979,7 +979,7 @@ def test_cut_execution(setup):
     np.testing.assert_array_equal(b_result, b_expected)
 
     # test ordered
-    if pd.__version__ >= "1.0.0":
+    if pd.__version__ >= "1.1.0":
         bins3 = [10, 100, 500]
         r = cut(s, bins3, labels=labels, ordered=False)
         r_result = r.execute().fetch()
