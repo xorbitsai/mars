@@ -157,6 +157,11 @@ class NodeInfoUploaderActor(mo.Actor):
                     self._env_uploaded = True
                 except ValueError:
                     pass
+        except RuntimeError as ex:  # pragma: no cover
+            if "shutdown" not in str(ex):
+                # when atexit is triggered, the default pool might be shutdown
+                # and to_thread will fail
+                raise
         except:  # noqa: E722  # nosec  # pylint: disable=bare-except  # pragma: no cover
             logger.exception(f"Failed to upload node info")
             raise
