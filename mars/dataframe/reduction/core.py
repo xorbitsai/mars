@@ -852,17 +852,12 @@ class ReductionCompiler:
             func_name = f"<custom_{self._custom_counter}>"
             self._custom_counter += 1
 
-        if (
-            inspect.isbuiltin(func)
-            or hasattr(func, "__module__")
-            and func.__module__.split(".")[0] == "numpy"
-        ):
-            raw_func_name = getattr(func, "__name__", None)
-            if raw_func_name in ["amax", "amin"]:
-                raw_func_name = raw_func_name.strip("a")
-
+        if inspect.isbuiltin(func):
+            raw_func_name = getattr(func, "__name__", "N/A")
             if raw_func_name in _agg_functions:
                 func = _agg_functions[raw_func_name]
+            else:
+                raise ValueError(f"Unexpected built-in function {raw_func_name}")
 
         compile_result = self._compile_function(func, func_name, ndim=ndim)
         self._compiled_funcs.append(compile_result)
