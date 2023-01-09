@@ -1350,6 +1350,15 @@ class MainActorPoolBase(ActorPoolBase):
                             event.set()
                     except asyncio.CancelledError:
                         raise
+                    except RuntimeError as ex:  # pragma: no cover
+                        if (
+                            "cannot schedule new futures after interpreter shutdown"
+                            not in str(ex)
+                        ):
+                            # to silence log when process exit, otherwise it
+                            # will raise "RuntimeError: cannot schedule new futures
+                            # after interpreter shutdown".
+                            logger.exception("Monitor sub pool %s failed", address)
                     except Exception:
                         # log the exception instead of stop monitoring the
                         # sub pool silently.
