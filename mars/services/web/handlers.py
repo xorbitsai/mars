@@ -14,6 +14,8 @@
 
 import os
 
+from tornado import web
+
 from .core import MarsRequestHandler
 
 
@@ -33,6 +35,11 @@ class IndexHandler(MarsRequestHandler):
         self.write(self._get_index_page())
 
 
-handlers = {
-    "/": IndexHandler,
+handlers = {"/": IndexHandler}
+
+static_handlers = {
+    r"[^\?\&]*/static/(.*)": (
+        web.StaticFileHandler,
+        {"path": os.path.join(os.path.dirname(__file__), "static")},
+    )
 }
