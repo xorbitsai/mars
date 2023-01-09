@@ -158,7 +158,7 @@ class NodeInfoUploaderActor(mo.Actor):
                 except ValueError:
                     pass
         except RuntimeError as ex:  # pragma: no cover
-            if "shutdown" not in str(ex):
+            if "cannot schedule new futures after interpreter shutdown" not in str(ex):
                 # when atexit is triggered, the default pool might be shutdown
                 # and to_thread will fail
                 raise
