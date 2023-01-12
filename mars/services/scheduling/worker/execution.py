@@ -18,6 +18,7 @@ import logging
 import operator
 import pprint
 import sys
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, Optional
@@ -35,6 +36,7 @@ from ...cluster import ClusterAPI
 from ...meta import MetaAPI
 from ...storage import StorageAPI
 from ...subtask import Subtask, SubtaskAPI, SubtaskResult, SubtaskStatus
+from ...task.task_info_collector import TaskInfoCollector
 from .workerslot import BandSlotManagerActor
 from .quota import QuotaActor
 
@@ -353,6 +355,7 @@ class SubtaskExecutionActor(mo.StatelessActor):
         )
         try:
             logger.debug("Preparing data for subtask %s", subtask.subtask_id)
+            fetch_start = time.time()
             prepare_data_task = asyncio.create_task(
                 _retry_run(
                     subtask, subtask_info, self._prepare_input_data, subtask, band_name
@@ -360,6 +363,14 @@ class SubtaskExecutionActor(mo.StatelessActor):
             )
             await asyncio.wait_for(
                 prepare_data_task, timeout=self._data_prepare_timeout
+            )
+            fetch_end = time.time()
+            collect_task_info = subtask.extra_config and subtask.extra_config.get(
+                "collect_task_info", False
+            )
+            task_info_collector = TaskInfoCollector(self.address, collect_task_info)
+            await task_info_collector.collect_fetch_time(
+                subtask, fetch_start, fetch_end
             )
 
             input_sizes = await self._collect_input_sizes(

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import List, Union, Dict
 
 from ....core import Tileable
 from ..core import TileableGraph, TaskResult
@@ -144,4 +144,9 @@ class AbstractTaskAPI(ABC):
         -------
         last_idle_time: float
             The last idle time if the task manager is idle else None.
+        """
+
+    async def save_task_info(self, task_info: Dict, path: str):
+        """
+        Save task information using yaml format.
         """
