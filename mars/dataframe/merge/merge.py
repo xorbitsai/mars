@@ -210,9 +210,7 @@ class DataFrameMerge(DataFrameOperand, DataFrameOperandMixin):
 
         # update default values.
         if self.on is None and self.left_on is None and self.right_on is None:
-            if self.left_index and self.right_index:
-                self.left_on, self.right_on = (), ()
-            else:
+            if not self.left_index or not self.right_index:
                 # use the common columns
                 left_cols = empty_left.columns
                 right_cols = empty_right.columns
