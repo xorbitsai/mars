@@ -82,6 +82,7 @@ async def new_cluster_in_isolation(
     external_addr_scheme: str = None,
     enable_internal_addr: bool = None,
     oscar_extra_conf: dict = None,
+    log_config: dict = None,
 ) -> ClientType:
     cluster = LocalCluster(
         address,
@@ -101,6 +102,7 @@ async def new_cluster_in_isolation(
         external_addr_scheme=external_addr_scheme,
         enable_internal_addr=enable_internal_addr,
         oscar_extra_conf=oscar_extra_conf,
+        log_config=log_config,
     )
     await cluster.start()
     return await LocalClient.create(cluster, timeout)
@@ -180,6 +182,7 @@ class LocalCluster:
         external_addr_scheme: str = None,
         enable_internal_addr: str = None,
         oscar_extra_conf: dict = None,
+        log_config: dict = None,
     ):
         # load third party extensions.
         init_extension_entrypoints()
@@ -196,6 +199,7 @@ class LocalCluster:
         self._subprocess_start_method = subprocess_start_method
         self._config = load_config(config, default_config_file=DEFAULT_CONFIG_FILE)
         execution_config = ExecutionConfig.from_config(self._config, backend=backend)
+        self._log_config = log_config
         self._backend = execution_config.backend
         self._web = web
         self._n_supervisor_process = n_supervisor_process
@@ -344,7 +348,7 @@ class LocalCluster:
             metrics=self._config.get("metrics", {}),
             web=self._web,
             # passing logging conf to config logging when create pools
-            logging_conf={},
+            logging_conf=self._log_config,
             oscar_config=self._config.get("oscar"),
         )
         self.supervisor_address = self._supervisor_pool.external_address
@@ -362,7 +366,7 @@ class LocalCluster:
                 metrics=self._config.get("metrics", {}),
                 web=self._web,
                 # passing logging conf to config logging when create pools
-                logging_conf={},
+                logging_conf=self._log_config,
                 oscar_config=self._config.get("oscar"),
             )
             self._worker_pools.append(worker_pool)
