@@ -88,6 +88,7 @@ def _parse_file_logging_config(
 
     stream_handler_sec = "handler_stream_handler"
     file_handler_sec = "handler_file_handler"
+    root_sec = "logger_root"
     # If not from cmd (like ipython) and user uses its own config file,
     # need to judge that whether handler_stream_handler section is in the config.
     if not from_cmd and stream_handler_sec in all_sections:
@@ -95,6 +96,7 @@ def _parse_file_logging_config(
         root_level, root_fmt = _get_root_logger_level_and_format()
         config[file_handler_sec]["level"] = root_level or "WARN"
         config[stream_handler_sec]["level"] = root_level or "WARN"
+        config[root_sec]["level"] = root_level or "WARN"
         if root_fmt:
             config.add_section("formatter_console")
             config["formatter_console"]["format"] = root_fmt
