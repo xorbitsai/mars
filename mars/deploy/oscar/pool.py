@@ -110,7 +110,7 @@ def _config_logging(**kwargs) -> Optional[configparser.RawConfigParser]:
     # web=False usually means it is a test environment.
     if not web:
         return
-    if "logging_conf" not in kwargs:
+    if kwargs.get("logging_conf", None) is None:
         return
     config = kwargs["logging_conf"]
     from_cmd = config.get("from_cmd", False)
