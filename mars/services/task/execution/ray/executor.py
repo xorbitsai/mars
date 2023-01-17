@@ -44,6 +44,7 @@ from .....utils import (
     calc_data_size,
     lazy_import,
     get_chunk_params,
+    classproperty,
 )
 from ....lifecycle.api import LifecycleAPI
 from ....meta.api import MetaAPI
@@ -73,33 +74,33 @@ class RayMetrics:
     _started_subtask_number = None
     _completed_subtask_number = None
 
-    @property
+    @classproperty
     def submitted_subtask_number(self):
-        if self._submitted_subtask_number is None:
-            self._submitted_subtask_number = Metrics.counter(
+        if RayMetrics._submitted_subtask_number is None:
+            RayMetrics._submitted_subtask_number = Metrics.counter(
                 "mars.ray_dag.submitted_subtask_number",
                 "The number of submitted subtask.",
                 ("session_id", "task_id", "stage_id"),
             )
-        return self._submitted_subtask_number
+        return RayMetrics._submitted_subtask_number
 
-    @property
+    @classproperty
     def started_subtask_number(self):
-        if self._started_subtask_number is None:
-            self._started_subtask_number = Metrics.counter(
+        if RayMetrics._started_subtask_number is None:
+            RayMetrics._started_subtask_number = Metrics.counter(
                 "mars.ray_dag.started_subtask_number",
                 "The number of started subtask.",
             )
-        return self._started_subtask_number
+        return RayMetrics._started_subtask_number
 
-    @property
+    @classproperty
     def completed_subtask_number(self):
-        if self._completed_subtask_number is None:
-            self._completed_subtask_number = Metrics.counter(
+        if RayMetrics._completed_subtask_number is None:
+            RayMetrics._completed_subtask_number = Metrics.counter(
                 "mars.ray_dag.completed_subtask_number",
                 "The number of completed subtask.",
             )
-        return self._completed_subtask_number
+        return RayMetrics._completed_subtask_number
 
 
 class RayTaskState(RayRemoteObjectManager):
