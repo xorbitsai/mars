@@ -32,7 +32,7 @@ class RaySerializer(Serializer):
         return serialized[0]
 
 
-if ray:
+if ray is not None:
     RaySerializer.register(object, "ray")
-    RaySerializer.register(ray.ObjectRef, "ray")
-    RaySerializer.register(ray.actor.ActorHandle, "ray")
+    RaySerializer.register("ray.ObjectRef", "ray")
+    RaySerializer.register("ray.actor.ActorHandle", "ray")

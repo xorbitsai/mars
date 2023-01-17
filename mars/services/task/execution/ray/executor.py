@@ -44,6 +44,7 @@ from .....utils import (
     calc_data_size,
     lazy_import,
     get_chunk_params,
+    classproperty,
 )
 from ....lifecycle.api import LifecycleAPI
 from ....meta.api import MetaAPI
@@ -68,20 +69,38 @@ ray = lazy_import("ray")
 logger = logging.getLogger(__name__)
 
 
-# Metrics
-submitted_subtask_number = Metrics.counter(
-    "mars.ray_dag.submitted_subtask_number",
-    "The number of submitted subtask.",
-    ("session_id", "task_id", "stage_id"),
-)
-started_subtask_number = Metrics.counter(
-    "mars.ray_dag.started_subtask_number",
-    "The number of started subtask.",
-)
-completed_subtask_number = Metrics.counter(
-    "mars.ray_dag.completed_subtask_number",
-    "The number of completed subtask.",
-)
+class RayMetrics:
+    _submitted_subtask_number = None
+    _started_subtask_number = None
+    _completed_subtask_number = None
+
+    @classproperty
+    def submitted_subtask_number(self):
+        if RayMetrics._submitted_subtask_number is None:
+            RayMetrics._submitted_subtask_number = Metrics.counter(
+                "mars.ray_dag.submitted_subtask_number",
+                "The number of submitted subtask.",
+                ("session_id", "task_id", "stage_id"),
+            )
+        return RayMetrics._submitted_subtask_number
+
+    @classproperty
+    def started_subtask_number(self):
+        if RayMetrics._started_subtask_number is None:
+            RayMetrics._started_subtask_number = Metrics.counter(
+                "mars.ray_dag.started_subtask_number",
+                "The number of started subtask.",
+            )
+        return RayMetrics._started_subtask_number
+
+    @classproperty
+    def completed_subtask_number(self):
+        if RayMetrics._completed_subtask_number is None:
+            RayMetrics._completed_subtask_number = Metrics.counter(
+                "mars.ray_dag.completed_subtask_number",
+                "The number of completed subtask.",
+            )
+        return RayMetrics._completed_subtask_number
 
 
 class RayTaskState(RayRemoteObjectManager):
@@ -177,7 +196,7 @@ def execute_subtask(
         subtask outputs and meta for outputs if `output_meta_keys` is provided.
     """
     init_metrics("ray")
-    started_subtask_number.record(1)
+    RayMetrics.started_subtask_number.record(1)
     ray_task_id = ray.get_runtime_context().task_id
     subtask_chunk_graph = deserialize(*subtask_chunk_graph)
     logger.info("Start subtask: %s, ray task id: %s.", subtask_id, ray_task_id)
@@ -270,7 +289,7 @@ def execute_subtask(
     output_values.extend(normal_output.values())
     output_values.extend(mapper_output.values())
     logger.info("Complete subtask: %s, ray task id: %s.", subtask_id, ray_task_id)
-    completed_subtask_number.record(1)
+    RayMetrics.completed_subtask_number.record(1)
     return output_values[0] if len(output_values) == 1 else output_values
 
 
@@ -719,7 +738,7 @@ class RayTaskExecutor(TaskExecutor):
             await asyncio.sleep(0)
             if output_count == 1:
                 output_object_refs = [output_object_refs]
-            submitted_subtask_number.record(1, metrics_tags)
+            RayMetrics.submitted_subtask_number.record(1, metrics_tags)
             monitor_context.submitted_subtasks.add(subtask)
             monitor_context.object_ref_to_subtask[output_object_refs[0]] = subtask
             subtask.runtime = _RaySubtaskRuntime()
