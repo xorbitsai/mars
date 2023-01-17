@@ -21,26 +21,18 @@ ray = lazy_import("ray")
 
 
 class RaySerializer(Serializer):
-    # avoid importing ray when init
-    _has_registered = False
     """Return raw object to let ray do serialization."""
 
     @buffered
     def serial(self, obj: Any, context: Dict):
-        if not self._has_registered:
-            register_serialization()
-            self._has_registered = True
         return (obj,), [], True
 
     def deserial(self, serialized: Tuple, context: Dict, subs: List[Any]):
-        if not self._has_registered:
-            register_serialization()
-            self._has_registered = True
         assert not subs
         return serialized[0]
 
 
-def register_serialization():
+if ray is not None:
     RaySerializer.register(object, "ray")
-    RaySerializer.register(ray.ObjectRef, "ray")
-    RaySerializer.register(ray.actor.ActorHandle, "ray")
+    RaySerializer.register("ray.ObjectRef", "ray")
+    RaySerializer.register("ray.actor.ActorHandle", "ray")
