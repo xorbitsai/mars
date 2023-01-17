@@ -173,7 +173,7 @@ class Metrics:
     def counter(
         name, description: str = "", tag_keys: Optional[Tuple[str, ...]] = None
     ):
-        logger.info(
+        logger.debug(
             "Initializing a counter with name: %s, tag keys: %s, backend: %s",
             name,
             tag_keys,
@@ -184,7 +184,7 @@ class Metrics:
     @staticmethod
     @gen_metric
     def gauge(name, description: str = "", tag_keys: Optional[Tuple[str, ...]] = None):
-        logger.info(
+        logger.debug(
             "Initializing a gauge whose name: %s, tag keys: %s, backend: %s",
             name,
             tag_keys,
@@ -195,7 +195,7 @@ class Metrics:
     @staticmethod
     @gen_metric
     def meter(name, description: str = "", tag_keys: Optional[Tuple[str, ...]] = None):
-        logger.info(
+        logger.debug(
             "Initializing a meter whose name: %s, tag keys: %s, backend: %s",
             name,
             tag_keys,
@@ -208,7 +208,7 @@ class Metrics:
     def histogram(
         name, description: str = "", tag_keys: Optional[Tuple[str, ...]] = None
     ):
-        logger.info(
+        logger.debug(
             "Initializing a histogram whose name: %s, tag keys: %s, backend: %s",
             name,
             tag_keys,
