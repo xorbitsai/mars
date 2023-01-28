@@ -62,7 +62,10 @@ class InputColumnSelector:
         op_cls: OperandType,
         func: Callable[[TileableData, Set[Any]], Dict[TileableData, Set[Any]]],
     ) -> None:
-        cls._OP_TO_SELECT_FUNCTION[op_cls] = func
+        if op_cls not in cls._OP_TO_SELECT_FUNCTION:
+            cls._OP_TO_SELECT_FUNCTION[op_cls] = func
+        else:
+            raise ValueError(f"key {op_cls} exists.")
 
     @classmethod
     def unregister(cls, op_cls: OperandType) -> None:
@@ -70,7 +73,7 @@ class InputColumnSelector:
             del cls._OP_TO_SELECT_FUNCTION[op_cls]
 
     @classmethod
-    def select_input_columns(
+    def select(
         cls, tileable_data: TileableData, required_cols: Set[Any]
     ) -> Dict[TileableData, Set[Any]]:
         """
@@ -238,7 +241,21 @@ def df_setitem_select_function(
         return ret
 
 
-SELECT_REQUIRED_OP_TYPES = [DataFrameBinOp, DataFrameUnaryOp, DataFrameIndex]
+@register_selector(DataFrameIndex)
+def df_getitem_select_function(
+    tileable_data: TileableData, required_cols: Set[Any]
+) -> Dict[TileableData, Set[Any]]:
+    if tileable_data.op.col_names:
+        return InputColumnSelector.select_required_input_columns(
+            tileable_data, required_cols
+        )
+    else:
+        return InputColumnSelector.select_all_input_columns(
+            tileable_data, required_cols
+        )
+
+
+SELECT_REQUIRED_OP_TYPES = [DataFrameBinOp, DataFrameUnaryOp]
 for op_type in SELECT_REQUIRED_OP_TYPES:
     InputColumnSelector.register(
         op_type, InputColumnSelector.select_required_input_columns
