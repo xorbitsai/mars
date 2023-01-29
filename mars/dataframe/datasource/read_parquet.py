@@ -333,7 +333,7 @@ class DataFrameReadParquet(
         for i, fragment in enumerate(dataset.fragments):
             chunk_op = op.copy().reset_key()
             chunk_op.path = chunk_path = path_prefix + fragment.path
-            relpath = os.path.relpath(chunk_path, dataset._base_dir)
+            relpath = os.path.relpath(chunk_path, op.path)
             partition_keys = dict(
                 tuple(s.split("=")) for s in relpath.split(os.sep)[:-1]
             )
