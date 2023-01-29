@@ -15,8 +15,7 @@
 # limitations under the License.
 
 import os
-import pickle
-from typing import Dict, List, Tuple
+from typing import Dict
 from urllib.parse import urlparse
 
 import numpy as np
@@ -247,8 +246,8 @@ class CudfEngine:
     def read_partitioned_to_cudf(
         cls,
         file,
-        partitions: "pq.ParquetPartitions",
-        partition_keys: List[Tuple],
+        partitions: Dict,
+        partition_keys: Dict,
         columns=None,
         nrows=None,
         **kwargs,
@@ -260,10 +259,10 @@ class CudfEngine:
         t = t.slice(0, nrows) if nrows is not None else t
         t = pa.table(t.columns, names=t.column_names)
         raw_df = cudf.DataFrame.from_arrow(t)
-        for i, (name, index) in enumerate(partition_keys):
-            dictionary = partitions[i].dictionary
-            codes = cudf.core.column.as_column(index, length=len(raw_df))
-            raw_df[name] = cudf.core.column.build_categorical_column(
+        for col, value in partition_keys.items():
+            codes = cudf.core.column.as_column(value, length=len(raw_df))
+            dictionary = partitions[col]
+            raw_df[col] = cudf.core.column.build_categorical_column(
                 categories=dictionary.tolist(),
                 codes=codes,
                 size=codes.size,
@@ -522,10 +521,9 @@ class DataFrameReadParquet(
 
         try:
             if op.partitions is not None:
-                partitions = pickle.loads(op.partitions)
                 ctx[out.key] = engine.read_partitioned_to_cudf(
                     file,
-                    partitions,
+                    op.partitions,
                     op.partition_keys,
                     columns=op.columns,
                     nrows=op.nrows,
