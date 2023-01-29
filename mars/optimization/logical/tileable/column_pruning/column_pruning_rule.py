@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict, Set, Any, Type, Union
+from typing import List, Dict, Set, Any, Type, Union, Optional
 
 import pandas as pd
 
@@ -68,9 +68,12 @@ class ColumnPruningRule(OptimizationRule):
     def _get_self_required_columns(self, data: TileableData) -> Set[Any]:
         return SelfColumnSelector.select(data)
 
-    def _get_required_columns(self, data: TileableData) -> Set[Any]:
+    def _get_required_columns(self, data: TileableData) -> Optional[Set[Any]]:
         required_columns = set()
-        required_columns.update(self._get_successor_required_columns(data))
+        successor_required_columns = self._get_successor_required_columns(data)
+        if successor_required_columns is None:
+            return None
+        required_columns.update(successor_required_columns)
         required_columns.update(self._get_self_required_columns(data))
         return required_columns
 
@@ -124,9 +127,11 @@ class ColumnPruningRule(OptimizationRule):
             op = data.op
 
             required_columns = self._get_required_columns(data)
-            if isinstance(op, ColumnPruneSupportedDataSourceMixin) and set(
-                required_columns
-            ) != self._get_all_columns(data):
+            if (
+                isinstance(op, ColumnPruneSupportedDataSourceMixin)
+                and required_columns is not None
+                and set(required_columns) != self._get_all_columns(data)
+            ):
                 op.set_pruned_columns(list(required_columns))
                 self.effective = True
                 pruned_nodes.append(data)
@@ -203,8 +208,10 @@ class ColumnPruningRule(OptimizationRule):
 
         for node in affected_nodes:
             required_columns = self._get_required_columns(node)
-            if isinstance(node, BaseDataFrameData) and set(required_columns) != set(
-                node.dtypes.index
+            if (
+                isinstance(node, BaseDataFrameData)
+                and required_columns is not None
+                and set(required_columns) != set(node.dtypes.index)
             ):
                 new_dtypes = pd.Series(
                     dict(

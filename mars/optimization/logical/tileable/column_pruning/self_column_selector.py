@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Set, Any, Callable
+from typing import Set, Any, Callable, Iterable
 
 from mars.core import TileableData
+from mars.dataframe.core import BaseDataFrameData, BaseSeriesData
 from mars.dataframe.indexing.getitem import DataFrameIndex
 from mars.dataframe.indexing.setitem import DataFrameSetitem
 from mars.typing import OperandType
@@ -66,12 +67,16 @@ def df_setitem_select_function(tileable_data: TileableData):
 @register_selector(DataFrameIndex)
 def df_index_select_function(tileable_data: TileableData):
     if tileable_data.op.col_names:
-        if isinstance(tileable_data.op.col_names, str):
-            return set([tileable_data.op.col_names])
-        else:
+        col_names = tileable_data.op.col_names
+        if isinstance(col_names, Iterable):
             return set(tileable_data.op.col_names)
+        else:
+            return {tileable_data.op.col_names}
     else:
-        return set(tileable_data.dtypes.index)
+        if isinstance(tileable_data, BaseDataFrameData):
+            return set(tileable_data.dtypes.index)
+        elif isinstance(tileable_data, BaseSeriesData):
+            return {tileable_data.name}
 
 
 # TODO: handle other ops
