@@ -64,6 +64,10 @@ jobs:
         else
           pip install numpy scipy cython
         fi
+        if [[ "$(mars.test.module)" == "dataframe" ]]; then
+          pip install sqlalchemy\<2
+        fi
+
         pip install -e ".[dev,extra]"
         pip install virtualenv flaky
 
