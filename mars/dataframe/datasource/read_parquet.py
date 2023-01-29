@@ -260,10 +260,12 @@ class CudfEngine:
         t = pa.table(t.columns, names=t.column_names)
         raw_df = cudf.DataFrame.from_arrow(t)
         for col, value in partition_keys.items():
-            codes = cudf.core.column.as_column(value, length=len(raw_df))
-            dictionary = partitions[col]
+            dictionary = partitions[col].tolist()
+            codes = cudf.core.column.as_column(
+                dictionary.index(value), length=len(raw_df)
+            )
             raw_df[col] = cudf.core.column.build_categorical_column(
-                categories=dictionary.tolist(),
+                categories=dictionary,
                 codes=codes,
                 size=codes.size,
                 offset=codes.offset,
