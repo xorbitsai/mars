@@ -55,6 +55,7 @@ jobs:
         if: ${{ matrix.with-kubernetes }}
         with:
           driver: none
+          kubernetes-version: v1.23.12
         uses: medyagh/setup-minikube@master
 
       - name: Install dependencies
