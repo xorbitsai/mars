@@ -132,7 +132,7 @@ def test_df_merge():
     assert left.data in input_columns
     assert input_columns[left.data] == {"foo", 1}
     assert right.data in input_columns
-    assert input_columns[right.data] == {"foo"}
+    assert input_columns[right.data] == {"foo", 1}
 
     joined = left.merge(right, on=["foo", "bar"])
     input_columns = InputColumnSelector.select(joined.data, {"baz"})
