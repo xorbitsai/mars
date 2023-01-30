@@ -14,11 +14,14 @@
 
 from typing import Set, Any, Callable, Iterable
 
-from mars.core import TileableData
-from mars.dataframe.core import BaseDataFrameData, BaseSeriesData
-from mars.dataframe.indexing.getitem import DataFrameIndex
-from mars.dataframe.indexing.setitem import DataFrameSetitem
-from mars.typing import OperandType
+from .utils import get_cols_exclude_index
+from .....core import TileableData
+from .....dataframe.core import BaseDataFrameData, BaseSeriesData
+from .....dataframe.groupby.aggregation import DataFrameGroupByAgg
+from .....dataframe.indexing.getitem import DataFrameIndex
+from .....dataframe.indexing.setitem import DataFrameSetitem
+from .....dataframe.merge import DataFrameMerge
+from .....typing import OperandType
 
 
 class SelfColumnSelector:
@@ -60,12 +63,12 @@ def register_selector(op_type: OperandType) -> Callable:
 
 
 @register_selector(DataFrameSetitem)
-def df_setitem_select_function(tileable_data: TileableData):
+def df_setitem_select_function(tileable_data: TileableData) -> Set[Any]:
     return {tileable_data.op.indexes}
 
 
 @register_selector(DataFrameIndex)
-def df_index_select_function(tileable_data: TileableData):
+def df_getitem_select_function(tileable_data: TileableData) -> Set[Any]:
     if tileable_data.op.col_names:
         col_names = tileable_data.op.col_names
         if isinstance(col_names, Iterable):
@@ -79,4 +82,21 @@ def df_index_select_function(tileable_data: TileableData):
             return {tileable_data.name}
 
 
-# TODO: handle other ops
+@register_selector(DataFrameGroupByAgg)
+def df_groupby_agg_select_function(tileable_data: TileableData) -> Set[Any]:
+    op: DataFrameGroupByAgg = tileable_data.op
+    by = op.groupby_params["by"]
+
+    if isinstance(tileable_data, BaseDataFrameData):
+        return get_cols_exclude_index(tileable_data, by)
+    elif isinstance(tileable_data, BaseSeriesData):
+        return tileable_data.name
+    else:
+        return set()
+
+
+@register_selector(DataFrameMerge)
+def df_merge_select_function(tileable_data: TileableData) -> Set[Any]:
+    op: DataFrameMerge = tileable_data.op
+    on = op.on
+    return get_cols_exclude_index(tileable_data, on)

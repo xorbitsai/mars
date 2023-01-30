@@ -27,6 +27,7 @@ from .....dataframe.indexing.getitem import DataFrameIndex
 from .....dataframe.indexing.setitem import DataFrameSetitem
 from .....dataframe.merge import DataFrameMerge
 from .....typing import OperandType
+from .utils import get_cols_exclude_index
 
 
 class InputColumnSelector:
@@ -134,29 +135,19 @@ def df_merge_select_function(
                 suffix_col = str(col) + suffix
                 if suffix_col in required_cols:
                     ret[df].add(col)
+                    # The column in the other dataframe has to be selected as well. Otherwise, in
+                    # the runtime, there will not be a column with suffix.
+                    other_data = right_data if df is left_data else left_data
+                    ret[other_data].add(col)
 
     if op.on is not None:
-        ret[left_data].update(_get_cols_exclude_index(left_data, op.on))
-        ret[right_data].update(_get_cols_exclude_index(right_data, op.on))
+        ret[left_data].update(get_cols_exclude_index(left_data, op.on))
+        ret[right_data].update(get_cols_exclude_index(right_data, op.on))
     if op.left_on is not None:
-        ret[left_data].update(_get_cols_exclude_index(left_data, op.left_on))
+        ret[left_data].update(get_cols_exclude_index(left_data, op.left_on))
     if op.right_on is not None:
-        ret[right_data].update(_get_cols_exclude_index(right_data, op.right_on))
+        ret[right_data].update(get_cols_exclude_index(right_data, op.right_on))
 
-    return ret
-
-
-def _get_cols_exclude_index(inp: BaseDataFrameData, cols: Any) -> Set[Any]:
-    ret = set()
-    if isinstance(cols, (list, tuple)):
-        for col in cols:
-            if col in inp.dtypes.index:
-                # exclude index
-                ret.add(col)
-    else:
-        if cols in inp.dtypes.index:
-            # exclude index
-            ret.add(cols)
     return ret
 
 
@@ -184,7 +175,7 @@ def df_groupby_agg_select_function(
         selected_cols = set()
         # group by keys should be included
         if not groupby_series:
-            selected_cols.update(_get_cols_exclude_index(inp, by))
+            selected_cols.update(get_cols_exclude_index(inp, by))
         # add agg columns
         if op.raw_func is not None:
             if op.raw_func == "size":
