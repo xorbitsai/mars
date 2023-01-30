@@ -74,7 +74,10 @@ class ColumnPruningRule(OptimizationRule):
         if successor_required_columns is None:
             return None
         required_columns.update(successor_required_columns)
-        required_columns.update(self._get_self_required_columns(data))
+        self_required_columns = self._get_self_required_columns(data)
+        if self_required_columns is None:
+            return None
+        required_columns.update(self_required_columns)
         return required_columns
 
     @staticmethod
