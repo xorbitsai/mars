@@ -132,6 +132,7 @@ def df_merge_select_function(
             if col in required_cols:
                 ret[df].add(col)
             else:
+                # TODO: this does not work when col is a tuple.
                 suffix_col = str(col) + suffix
                 if suffix_col in required_cols:
                     ret[df].add(col)

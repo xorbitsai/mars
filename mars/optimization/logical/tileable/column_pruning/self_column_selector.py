@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Set, Any, Callable, Iterable
+from typing import Set, Any, Callable
 
 from .utils import get_cols_exclude_index
 from .....core import TileableData
@@ -74,7 +74,7 @@ def df_setitem_select_function(tileable_data: TileableData) -> Set[Any]:
 def df_getitem_select_function(tileable_data: TileableData) -> Set[Any]:
     if tileable_data.op.col_names:
         col_names = tileable_data.op.col_names
-        if isinstance(col_names, Iterable):
+        if isinstance(col_names, list):
             return set(tileable_data.op.col_names)
         else:
             return {tileable_data.op.col_names}
@@ -87,19 +87,51 @@ def df_getitem_select_function(tileable_data: TileableData) -> Set[Any]:
 
 @register_selector(DataFrameGroupByAgg)
 def df_groupby_agg_select_function(tileable_data: TileableData) -> Set[Any]:
+    """
+    Make sure the "group by columns" are preserved.
+    """
+
     op: DataFrameGroupByAgg = tileable_data.op
     by = op.groupby_params["by"]
 
     if isinstance(tileable_data, BaseDataFrameData):
         return get_cols_exclude_index(tileable_data, by)
     elif isinstance(tileable_data, BaseSeriesData):
-        return tileable_data.name
+        return {tileable_data.name}
     else:
         return set()
 
 
 @register_selector(DataFrameMerge)
 def df_merge_select_function(tileable_data: TileableData) -> Set[Any]:
+    """
+    Make sure the merge keys are preserved.
+    """
+
     op: DataFrameMerge = tileable_data.op
     on = op.on
-    return get_cols_exclude_index(tileable_data, on)
+    if on is not None:
+        return get_cols_exclude_index(tileable_data, on)
+
+    ret = set()
+    left_data: BaseDataFrameData = op.inputs[0]
+    right_data: BaseDataFrameData = op.inputs[1]
+    left_on = op.left_on
+    right_on = op.right_on
+    for data, merge_keys, suffix in zip(
+        [left_data, right_data], [left_on, right_on], op.suffixes
+    ):
+        for col in data.dtypes.index:
+            if col in merge_keys:
+                other_data = right_data if data is left_data else left_data
+                other_merge_keys = right_on if merge_keys is left_on else left_on
+
+                if col in other_data.dtypes.index and col not in other_merge_keys:
+                    # if the merge key exists in the other dataframe but not in the other
+                    # dataframe's merge keys, suffixes will be added.
+                    # TODO: this does not work when col is a tuple.
+                    suffix_col = str(col) + suffix
+                    ret.add(suffix_col)
+                else:
+                    ret.add(col)
+    return ret

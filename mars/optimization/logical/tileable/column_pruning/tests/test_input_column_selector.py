@@ -280,3 +280,22 @@ def test_select_all():
     assert len(input_columns) == 1
     assert head.data.inputs[0] in input_columns
     assert input_columns[head.data.inputs[0]] == {"foo", "bar", "baz", "qux"}
+
+
+def test_getitem():
+    df: DataFrame = DataFrame(
+        {
+            "foo": (1, 1, 2, 2),
+            "bar": (3, 4, 3, 4),
+            "baz": (5, 6, 7, 8),
+            "qux": (9, 10, 11, 12),
+        }
+    )
+
+    getitem = df[df["foo"] == 1]
+    input_columns = InputColumnSelector.select(getitem.data, {"foo"})
+    assert input_columns[getitem.data.inputs[0]] == {"foo", "bar", "baz", "qux"}
+
+    getitem = df["foo"]
+    input_columns = InputColumnSelector.select(getitem.data, {"foo"})
+    assert input_columns[getitem.data.inputs[0]] == {"foo"}
