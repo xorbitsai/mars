@@ -64,6 +64,10 @@ def test_df_merge():
     required_columns = SelfColumnSelector.select(joined.data)
     assert required_columns == {"foo", "bar"}
 
+    joined = left.merge(right, left_on=["foo", "bar"], right_on=["foo", "bar"])
+    required_columns = SelfColumnSelector.select(joined.data)
+    assert required_columns == {"foo", "bar"}
+
     joined = left.merge(right)
     required_columns = SelfColumnSelector.select(joined.data)
     assert required_columns == {"foo", "bar", 1}
@@ -71,3 +75,27 @@ def test_df_merge():
     joined = left.merge(right, left_on=["foo"], right_on=["bar"])
     required_columns = SelfColumnSelector.select(joined.data)
     assert required_columns == {"foo_x", "bar_y"}
+
+    joined = left.merge(right, left_index=True, right_index=True)
+    required_columns = SelfColumnSelector.select(joined.data)
+    assert required_columns == set()
+
+    joined = left.merge(right, left_index=True, right_on="foo")
+    required_columns = SelfColumnSelector.select(joined.data)
+    assert required_columns == {"foo"}
+
+    joined = left.merge(right, left_index=True, right_on=["foo"])
+    required_columns = SelfColumnSelector.select(joined.data)
+    assert required_columns == {"foo"}
+
+    joined = left.merge(right, left_on="foo", right_index=True)
+    required_columns = SelfColumnSelector.select(joined.data)
+    assert required_columns == {"foo"}
+
+    joined = left.merge(right, left_on=["foo"], right_index=True)
+    required_columns = SelfColumnSelector.select(joined.data)
+    assert required_columns == {"foo"}
+
+    joined = left.merge(right, left_on=["foo"], right_index=True)
+    required_columns = SelfColumnSelector.select(joined.data)
+    assert required_columns == {"foo"}

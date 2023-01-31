@@ -116,11 +116,30 @@ def df_merge_select_function(tileable_data: TileableData) -> Set[Any]:
     ret = set()
     left_data: BaseDataFrameData = op.inputs[0]
     right_data: BaseDataFrameData = op.inputs[1]
-    left_on = op.left_on
-    right_on = op.right_on
+    left_index = op.left_index
+    right_index = op.right_index
+    left_on = op.left_on if isinstance(op.left_on, list) else [op.left_on]
+    right_on = op.right_on if isinstance(op.right_on, list) else [op.right_on]
+
+    if left_index and right_index:
+        return ret
+
+    if left_index:
+        for col in right_data.dtypes.index:
+            if col in right_on:
+                ret.add(col)
+        return ret
+    if right_index:
+        for col in left_data.dtypes.index:
+            if col in left_on:
+                ret.add(col)
+        return ret
+
     for data, merge_keys, suffix in zip(
         [left_data, right_data], [left_on, right_on], op.suffixes
     ):
+        if merge_keys is None:
+            continue
         for col in data.dtypes.index:
             if col in merge_keys:
                 other_data = right_data if data is left_data else left_data
