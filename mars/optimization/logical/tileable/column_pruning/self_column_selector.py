@@ -64,7 +64,10 @@ def register_selector(op_type: OperandType) -> Callable:
 
 @register_selector(DataFrameSetitem)
 def df_setitem_select_function(tileable_data: TileableData) -> Set[Any]:
-    return {tileable_data.op.indexes}
+    if isinstance(tileable_data.op.indexes, list):
+        return set(tileable_data.op.indexes)
+    else:
+        return {tileable_data.op.indexes}
 
 
 @register_selector(DataFrameIndex)
