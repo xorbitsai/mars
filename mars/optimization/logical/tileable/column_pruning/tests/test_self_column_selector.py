@@ -95,7 +95,3 @@ def test_df_merge():
     joined = left.merge(right, left_on=["foo"], right_index=True)
     required_columns = SelfColumnSelector.select(joined.data)
     assert required_columns == {"foo"}
-
-    joined = left.merge(right, left_on=["foo"], right_index=True)
-    required_columns = SelfColumnSelector.select(joined.data)
-    assert required_columns == {"foo"}
