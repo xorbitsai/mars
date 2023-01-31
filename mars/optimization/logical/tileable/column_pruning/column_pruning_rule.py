@@ -65,7 +65,8 @@ class ColumnPruningRule(OptimizationRule):
         else:
             return self._get_all_columns(data)
 
-    def _get_self_required_columns(self, data: TileableData) -> Set[Any]:
+    @staticmethod
+    def _get_self_required_columns(data: TileableData) -> Set[Any]:
         return SelfColumnSelector.select(data)
 
     def _get_required_columns(self, data: TileableData) -> Optional[Set[Any]]:
