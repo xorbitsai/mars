@@ -62,8 +62,9 @@ class InputColumnSelector:
         cls,
         op_cls: OperandType,
         func: Callable[[TileableData, Set[Any]], Dict[TileableData, Set[Any]]],
+        replace: bool,
     ) -> None:
-        if op_cls not in cls._OP_TO_SELECT_FUNCTION:
+        if op_cls not in cls._OP_TO_SELECT_FUNCTION or replace:
             cls._OP_TO_SELECT_FUNCTION[op_cls] = func
         else:
             raise ValueError(f"key {op_cls} exists.")

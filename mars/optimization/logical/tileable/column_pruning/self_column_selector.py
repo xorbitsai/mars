@@ -33,8 +33,9 @@ class SelfColumnSelector:
         cls,
         op_cls: OperandType,
         func: Callable[[TileableData], Set[Any]],
+        replace: bool,
     ) -> None:
-        if op_cls not in cls._OP_TO_SELECT_FUNCTION:
+        if op_cls not in cls._OP_TO_SELECT_FUNCTION or replace:
             cls._OP_TO_SELECT_FUNCTION[op_cls] = func
         else:
             raise ValueError(f"key {op_cls} exists.")
@@ -72,7 +73,7 @@ def df_setitem_select_function(tileable_data: TileableData) -> Set[Any]:
 
 @register_selector(DataFrameIndex)
 def df_getitem_select_function(tileable_data: TileableData) -> Set[Any]:
-    if tileable_data.op.col_names:
+    if tileable_data.op.col_names is not None:
         col_names = tileable_data.op.col_names
         if isinstance(col_names, list):
             return set(tileable_data.op.col_names)

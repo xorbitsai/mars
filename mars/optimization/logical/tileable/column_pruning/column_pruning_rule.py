@@ -76,8 +76,6 @@ class ColumnPruningRule(OptimizationRule):
             return None
         required_columns.update(successor_required_columns)
         self_required_columns = self._get_self_required_columns(data)
-        if self_required_columns is None:
-            return None
         required_columns.update(self_required_columns)
         return required_columns
 
@@ -116,7 +114,7 @@ class ColumnPruningRule(OptimizationRule):
             if self._is_skipped_type(data):
                 continue
             self._context[data] = InputColumnSelector.select(
-                data, self._get_required_columns(data)
+                data, self._get_successor_required_columns(data)
             )
 
     def _prune_columns(self) -> List[TileableData]:
@@ -130,13 +128,13 @@ class ColumnPruningRule(OptimizationRule):
 
             op = data.op
 
-            required_columns = self._get_required_columns(data)
+            successor_required_columns = self._get_successor_required_columns(data)
             if (
                 isinstance(op, ColumnPruneSupportedDataSourceMixin)
-                and required_columns is not None
-                and set(required_columns) != self._get_all_columns(data)
+                and successor_required_columns is not None
+                and set(successor_required_columns) != self._get_all_columns(data)
             ):
-                op.set_pruned_columns(list(required_columns))
+                op.set_pruned_columns(list(successor_required_columns))
                 self.effective = True
                 pruned_nodes.append(data)
                 datasource_nodes.append(data)
