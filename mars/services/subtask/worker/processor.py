@@ -418,7 +418,7 @@ class SubtaskProcessor:
                 self._write_aggregated_mapper_data(key_and_band, objects, shuffle_keys)
             )
         infos = await asyncio.gather(*write_tasks)
-        for (key, memory_size, store_size, object_id) in infos:
+        for key, memory_size, store_size, object_id in infos:
             data_key_to_memory_size[key] = memory_size
             data_key_to_store_size[key] = store_size
             data_key_to_object_id[key] = object_id
@@ -588,7 +588,9 @@ class SubtaskProcessor:
             self.result.status = SubtaskStatus.cancelled
             self.result.progress = 1.0
             raise
-        except BaseException as ex:  # noqa: E722  # nosec  # pylint: disable=bare-except
+        except (
+            BaseException
+        ) as ex:  # noqa: E722  # nosec  # pylint: disable=bare-except
             self.result.status = SubtaskStatus.errored
             self.result.progress = 1.0
             if isinstance(ex, ExecutionError):

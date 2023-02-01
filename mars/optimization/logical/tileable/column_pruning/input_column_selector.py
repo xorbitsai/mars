@@ -30,7 +30,6 @@ from .....typing import OperandType
 
 
 class InputColumnSelector:
-
     _OP_TO_SELECT_FUNCTION = {}
 
     @staticmethod

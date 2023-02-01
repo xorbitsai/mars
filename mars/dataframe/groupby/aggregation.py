@@ -562,7 +562,6 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
         sample_chunks: List[ChunkType],
         agg_chunk_len: int,
     ):
-
         properties = dict(
             by=op.groupby_params["by"],
             gpu=op.is_gpu(),
