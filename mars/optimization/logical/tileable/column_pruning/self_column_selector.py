@@ -25,7 +25,6 @@ from .....typing import OperandType
 
 
 class SelfColumnSelector:
-
     _OP_TO_SELECT_FUNCTION = {}
 
     @classmethod
@@ -33,7 +32,7 @@ class SelfColumnSelector:
         cls,
         op_cls: OperandType,
         func: Callable[[TileableData], Set[Any]],
-        replace: bool,
+        replace: bool = False,
     ) -> None:
         if op_cls not in cls._OP_TO_SELECT_FUNCTION or replace:
             cls._OP_TO_SELECT_FUNCTION[op_cls] = func
