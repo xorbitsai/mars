@@ -483,9 +483,7 @@ class DataFrameGroupByAgg(DataFrameOperand, DataFrameOperandMixin):
                 by = []
                 for v in map_op.groupby_params["by"]:
                     if isinstance(v, ENTITY_TYPE):
-                        by_chunk = v.cix[
-                            chunk.index[0],
-                        ]
+                        by_chunk = v.cix[chunk.index[0],]
                         chunk_inputs.append(by_chunk)
                         by.append(by_chunk)
                     else:
