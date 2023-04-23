@@ -46,12 +46,12 @@ jobs:
       - name: Run GPU CI
         shell: bash
         run: |
-          coverage run -m pytest ./ -m cuda --cov-config=setup.cfg --cov-report= --cov=mars
-          coverage xml
+          pytest ./ -m cuda --cov-config=setup.cfg --cov-report=xml --cov=mars
 
-      - name: Report coverage data
-        shell: bash
-        run: |
-          bash <(curl -s https://codecov.io/bash)
-          rm -rf *.coverage*
-          rm -rf coverage.xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+          flags: unittests
+          name: codecov-gpu
+          verbose: true

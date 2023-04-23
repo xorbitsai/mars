@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import weakref
 from typing import AsyncGenerator
 
 from .._utils cimport to_str, new_random_id

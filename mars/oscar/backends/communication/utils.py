@@ -18,7 +18,7 @@ from typing import Dict, List, Union
 import numpy as np
 
 from ....serialization.aio import BUFFER_SIZES_NAME
-from ....utils import lazy_import
+from ....utils import lazy_import, convert_to_cupy_ndarray, is_cuda_buffer
 
 cupy = lazy_import("cupy")
 cudf = lazy_import("cudf")
@@ -27,23 +27,10 @@ rmm = lazy_import("rmm")
 CUDA_CHUNK_SIZE = 16 * 1024**2
 
 
-def _convert_to_cupy_ndarray(
-    cuda_buffer: Union["cupy.ndarray", "rmm.DeviceBuffer"]
-) -> "cupy.ndarray":
-    if isinstance(cuda_buffer, cupy.ndarray):
-        return cuda_buffer
-
-    size = cuda_buffer.nbytes
-    data = cuda_buffer.__cuda_array_interface__["data"][0]
-    memory = cupy.cuda.UnownedMemory(data, size, cuda_buffer)
-    ptr = cupy.cuda.MemoryPointer(memory, 0)
-    return cupy.ndarray(shape=size, dtype="u1", memptr=ptr)
-
-
 def write_buffers(writer: StreamWriter, buffers: List):
     def _write_cuda_buffer(cuda_buffer: Union["cupy.ndarray", "rmm.DeviceBuffer"]):
         # convert cuda buffer to cupy ndarray
-        cuda_buffer = _convert_to_cupy_ndarray(cuda_buffer)
+        cuda_buffer = convert_to_cupy_ndarray(cuda_buffer)
 
         chunk_size = CUDA_CHUNK_SIZE
         offset = 0
@@ -58,7 +45,7 @@ def write_buffers(writer: StreamWriter, buffers: List):
             offset += size
 
     for buffer in buffers:
-        if hasattr(buffer, "__cuda_array_interface__"):
+        if is_cuda_buffer(buffer):
             # GPU buffer
             _write_cuda_buffer(buffer)
         else:
@@ -77,7 +64,7 @@ async def read_buffers(header: Dict, reader: StreamReader):
                 buffers.append(content)
             else:
                 buffer = rmm.DeviceBuffer(size=buf_size)
-                arr = _convert_to_cupy_ndarray(buffer)
+                arr = convert_to_cupy_ndarray(buffer)
                 offset = 0
                 chunk_size = CUDA_CHUNK_SIZE
                 while offset < buf_size:

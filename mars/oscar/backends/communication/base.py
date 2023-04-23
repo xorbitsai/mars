@@ -264,11 +264,11 @@ class Client(ABC):
         return dict()
 
     @implements(Channel.send)
-    async def send(self, message):
+    async def send(self, message: Any):
         return await self.channel.send(message)
 
     @implements(Channel.recv)
-    async def recv(self):
+    async def recv(self) -> Any:
         return await self.channel.recv()
 
     async def close(self):

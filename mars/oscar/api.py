@@ -13,13 +13,14 @@
 # limitations under the License.
 
 from urllib.parse import urlparse
-from typing import Any, Dict, Type, Tuple
+from typing import Any, Dict, Type, Tuple, List
 from numbers import Number
 from collections import defaultdict
 
+from ..lib.aio import AioFileObject
 from .backend import get_backend
 from .context import get_context
-from .core import _Actor, _StatelessActor, ActorRef
+from .core import _Actor, _StatelessActor, ActorRef, BufferRef, FileObjectRef
 
 
 async def create_actor(actor_cls, *args, uid=None, address=None, **kwargs) -> ActorRef:
@@ -42,9 +43,19 @@ async def actor_ref(*args, **kwargs) -> ActorRef:
     return await ctx.actor_ref(*args, **kwargs)
 
 
-async def kill_actor(actor_ref):
+async def kill_actor(actor_ref: ActorRef):
     ctx = get_context()
     return await ctx.kill_actor(actor_ref)
+
+
+def buffer_ref(address: str, buffer: Any) -> BufferRef:
+    ctx = get_context()
+    return ctx.buffer_ref(address, buffer)
+
+
+def file_object_ref(address: str, fileobj: AioFileObject) -> FileObjectRef:
+    ctx = get_context()
+    return ctx.file_object_ref(address, fileobj)
 
 
 async def create_actor_pool(address: str, n_process: int = None, **kwargs):
@@ -68,6 +79,21 @@ async def wait_actor_pool_recovered(address: str, main_pool_address: str = None)
 async def get_pool_config(address: str):
     ctx = get_context()
     return await ctx.get_pool_config(address)
+
+
+async def copyto_via_buffers(local_buffers: list, remote_buffer_refs: List[BufferRef]):
+    ctx = get_context()
+    return await ctx.copyto_via_buffers(local_buffers, remote_buffer_refs)
+
+
+async def copyto_via_file_objects(
+    local_file_objects: List[AioFileObject],
+    remote_file_object_refs: List[FileObjectRef],
+):
+    ctx = get_context()
+    return await ctx.copyto_via_file_objects(
+        local_file_objects, remote_file_object_refs
+    )
 
 
 def setup_cluster(address_to_resources: Dict[str, Dict[str, Number]]):

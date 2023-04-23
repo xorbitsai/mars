@@ -62,6 +62,7 @@ from .message import (
     ControlMessageType,
 )
 from .router import Router
+from .transfer import TransferServer
 
 logger = logging.getLogger(__name__)
 ray = lazy_import("ray")
@@ -493,18 +494,39 @@ class AbstractActorPool(ABC):
     def stopped(self) -> bool:
         return self._stopped.is_set()
 
-    async def on_new_channel(self, channel: Channel):
-        while not self._stopped.is_set():
+    @classmethod
+    async def _recv_message(cls, channel: Channel):
+        try:
+            return await channel.recv()
+        except EOFError:
+            # no data to read, check channel
             try:
-                message = await channel.recv()
-            except EOFError:
-                # no data to read, check channel
-                try:
-                    await channel.close()
-                except (ConnectionError, EOFError):
-                    # close failed, ignore
-                    pass
-                return
+                await channel.close()
+            except (ConnectionError, EOFError):  # pragma: no cover
+                # close failed, ignore
+                pass
+
+    async def on_new_channel(self, channel: Channel):
+        message = await self._recv_message(channel)
+        if (
+            message.message_type == MessageType.control
+            and message.control_message_type == ControlMessageType.switch_to_transfer
+        ):
+            # switch this channel to data transfer channel
+            # the channel will be handed over to TransferServer
+            # and this loop will exit
+            return await TransferServer.handle_transfer_channel(channel, self._stopped)
+        else:
+            asyncio.create_task(self.process_message(message, channel))
+            # delete to release the reference of message
+            del message
+            await asyncio.sleep(0)
+
+        # continue to keep processing messages
+        while not self._stopped.is_set():
+            message = await self._recv_message(channel)
+            if message is None:
+                break
             asyncio.create_task(self.process_message(message, channel))
             # delete to release the reference of message
             del message
