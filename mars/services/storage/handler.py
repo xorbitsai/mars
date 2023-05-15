@@ -601,7 +601,7 @@ class StorageHandlerActor(mo.Actor):
                 )
             fetch_keys.extend(list(keys))
 
-        await asyncio.gather(*transfer_tasks)
+        yield asyncio.gather(*transfer_tasks)
 
         set_meta_keys = set()
         for data_key in fetch_keys:
