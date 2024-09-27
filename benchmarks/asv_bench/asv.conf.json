@@ -96,9 +96,12 @@
         "psutil": [],
         "tornado": [],
         "sqlalchemy": [],
-        "defusedxml": []
+        "defusedxml": [],
+        "ucx": ["", null],
+        "ucx-proc[build=cpu]": ["", null],
+        "ucx-py": ["", null]
     },
-    "conda_channels": ["defaults", "conda-forge"],
+    "conda_channels": ["defaults", "conda-forge", "rapidsai"],
 
     // Combinations of libraries/python versions can be excluded/included
     // from the set to test. Each entry is a dictionary containing additional
@@ -127,11 +130,14 @@
     // - env_nobuild
     //     Non-build environment variables
     //
-    // "exclude": [
-    //     {"python": "3.2", "sys_platform": "win32"}, // skip py3.2 on windows
-    //     {"environment_type": "conda", "req": {"six": null}}, // don't run without six on conda
-    //     {"env": {"ENV_VAR_1": "val2"}}, // skip val2 for ENV_VAR_1
-    // ],
+    "exclude": [
+        {"sys_platform": "(?!linux).*", "req": {"ucx": ""}},
+        {"sys_platform": "(?!linux).*", "req": {"ucx-proc[build=cpu]": ""}},
+        {"sys_platform": "(?!linux).*", "req": {"ucx-py":  ""}},
+        {"sys_platform": "(?=linux).*", "req": {"ucx": null}},
+        {"sys_platform": "(?=linux).*", "req": {"ucx-proc[build=cpu]": null}},
+        {"sys_platform": "(?=linux).*", "req": {"ucx-py":  null}}
+    ],
     //
     // "include": [
     //     // additional env for python2.7

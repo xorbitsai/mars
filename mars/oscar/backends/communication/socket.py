@@ -245,7 +245,12 @@ class SocketClient(Client):
     ) -> "Client":
         host, port = dest_address.split(":", 1)
         port = int(port)
-        (reader, writer) = await asyncio.open_connection(host=host, port=port, **kwargs)
+        try:
+            (reader, writer) = await asyncio.open_connection(
+                host=host, port=port, **kwargs
+            )
+        except (asyncio.TimeoutError, TimeoutError) as e:  # pragma: no cover
+            raise ConnectionError(f"Failed to connect {dest_address}") from e
         channel = SocketChannel(
             reader, writer, local_address=local_address, dest_address=dest_address
         )
